@@ -35,7 +35,7 @@ const STATUS_LABELS: Record<string, string> = {
   preparing: 'Готовится',
   delivering: 'Доставляется',
   completed: 'Завершен',
-  cancelled: 'Отменен',
+  canceled: 'Отменен',
 };
 
 export default function Analytics() {
