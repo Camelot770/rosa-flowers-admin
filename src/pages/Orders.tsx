@@ -59,6 +59,7 @@ export default function Orders() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('all');
   const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [error, setError] = useState('');
 
   const fetchOrders = (status: string) => {
     setLoading(true);
@@ -75,11 +76,13 @@ export default function Orders() {
 
   const handleStatusChange = async (orderId: number, newStatus: string) => {
     setUpdatingId(orderId);
+    setError('');
     try {
       await api.put(`/orders/${orderId}/status`, { status: newStatus });
       fetchOrders(activeTab);
     } catch (err) {
       console.error(err);
+      setError(`Не удалось обновить статус заказа #${orderId}`);
     } finally {
       setUpdatingId(null);
     }
@@ -105,6 +108,12 @@ export default function Orders() {
           </button>
         ))}
       </div>
+
+      {error && (
+        <div className="p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg">
+          {error}
+        </div>
+      )}
 
       {/* Table */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">

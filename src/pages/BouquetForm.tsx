@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
+import { useState, useEffect, useMemo, FormEvent, ChangeEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Upload, X, Loader2 } from 'lucide-react';
 import api from '../api/client';
@@ -58,11 +58,8 @@ export default function BouquetForm() {
     if (!id) return;
     setFetching(true);
     api
-      .get('/bouquets')
-      .then(({ data }) => {
-        const bouquet = (Array.isArray(data) ? data : data.bouquets || []).find(
-          (b: any) => String(b.id) === String(id) || b._id === id
-        );
+      .get(`/bouquets/${id}`)
+      .then(({ data: bouquet }) => {
         if (!bouquet) {
           setError('Букет не найден');
           return;
@@ -80,9 +77,8 @@ export default function BouquetForm() {
           sortOrder: String(bouquet.sortOrder || 0),
         });
         if (bouquet.images) {
-          setExistingImages(
-            Array.isArray(bouquet.images) ? bouquet.images : [bouquet.images]
-          );
+          const imgs = Array.isArray(bouquet.images) ? bouquet.images : [bouquet.images];
+          setExistingImages(imgs.map((img: any) => typeof img === 'string' ? img : img.url));
         }
       })
       .catch(() => setError('Ошибка загрузки букета'))
@@ -114,6 +110,14 @@ export default function BouquetForm() {
     setExistingImages((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // Create and cleanup object URLs for new image previews
+  const imagePreviewUrls = useMemo(() => images.map((f) => URL.createObjectURL(f)), [images]);
+  useEffect(() => {
+    return () => {
+      imagePreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [imagePreviewUrls]);
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
@@ -141,13 +145,9 @@ export default function BouquetForm() {
       });
 
       if (isEdit) {
-        await api.put(`/bouquets/${id}`, fd, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
+        await api.put(`/bouquets/${id}`, fd);
       } else {
-        await api.post('/bouquets', fd, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
+        await api.post('/bouquets', fd);
       }
 
       navigate('/bouquets');
@@ -225,7 +225,7 @@ export default function BouquetForm() {
               value={form.price}
               onChange={handleChange}
               required
-              min="0"
+              min="1"
               placeholder="0"
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
             />
@@ -355,7 +355,7 @@ export default function BouquetForm() {
               {images.map((file, i) => (
                 <div key={i} className="relative w-24 h-24 rounded-lg overflow-hidden border border-gray-200">
                   <img
-                    src={URL.createObjectURL(file)}
+                    src={imagePreviewUrls[i]}
                     alt=""
                     className="w-full h-full object-cover"
                   />

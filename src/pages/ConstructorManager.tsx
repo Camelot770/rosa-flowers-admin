@@ -85,6 +85,8 @@ export default function ConstructorManager() {
   };
 
   const handleDelete = async (item: ConstructorItem) => {
+    if (!window.confirm(`Удалить «${item.name}»?`)) return;
+
     const tab = TABS.find((t) => t.key === activeTab)!;
     const itemId = item.id || item._id;
 
@@ -179,7 +181,7 @@ export default function ConstructorManager() {
             value={newPrice}
             onChange={(e) => setNewPrice(e.target.value)}
             required
-            min="0"
+            min="1"
             placeholder="0"
             className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
           />

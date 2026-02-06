@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/client';
+import { imageUrl } from '../utils/image';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
 interface BouquetImage {
   url: string;
@@ -96,7 +95,7 @@ export default function Bouquets() {
               <tbody className="divide-y divide-gray-100">
                 {bouquets.map((b) => {
                   const thumbUrl = b.images?.[0]
-                    ? `${API_URL}${b.images[0].url}`
+                    ? imageUrl(b.images[0].url)
                     : null;
 
                   return (
