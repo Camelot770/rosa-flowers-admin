@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, Flower2, Palette, Package, Star,
-  BarChart3, Settings, LogOut,
+  LayoutDashboard, Flower2, Package, Star,
+  BarChart3, Settings, LogOut, Users, Send,
 } from 'lucide-react';
 
 interface Props {
@@ -11,11 +11,12 @@ interface Props {
 const menuItems = [
   { path: '/', icon: LayoutDashboard, label: 'Дашборд' },
   { path: '/bouquets', icon: Flower2, label: 'Букеты' },
-  { path: '/constructor', icon: Palette, label: 'Конструктор' },
   { path: '/orders', icon: Package, label: 'Заказы' },
+  { path: '/users', icon: Users, label: 'Клиенты' },
   { path: '/loyalty', icon: Star, label: 'Лояльность' },
   { path: '/analytics', icon: BarChart3, label: 'Аналитика' },
   { path: '/settings', icon: Settings, label: 'Настройки' },
+  { path: '/broadcast', icon: Send, label: 'Рассылка' },
 ];
 
 export default function Sidebar({ onLogout }: Props) {
