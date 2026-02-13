@@ -5,11 +5,12 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Bouquets from './pages/Bouquets';
 import BouquetForm from './pages/BouquetForm';
-import ConstructorManager from './pages/ConstructorManager';
+import Users from './pages/Users';
 import Orders from './pages/Orders';
 import Loyalty from './pages/Loyalty';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
+import Broadcast from './pages/Broadcast';
 import Sidebar from './components/layout/Sidebar';
 
 function App() {
@@ -58,11 +59,12 @@ function App() {
           <Route path="/bouquets" element={<Bouquets />} />
           <Route path="/bouquets/new" element={<BouquetForm />} />
           <Route path="/bouquets/:id" element={<BouquetForm />} />
-          <Route path="/constructor" element={<ConstructorManager />} />
+          <Route path="/users" element={<Users />} />
           <Route path="/orders" element={<Orders />} />
           <Route path="/loyalty" element={<Loyalty />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/broadcast" element={<Broadcast />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </main>

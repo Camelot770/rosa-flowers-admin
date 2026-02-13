@@ -1,5 +1,5 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { Loader2, Save, CheckCircle } from 'lucide-react';
+import { Loader2, Save, CheckCircle, Building2, Truck, Star, Share2 } from 'lucide-react';
 import api from '../api/client';
 
 interface SettingField {
@@ -9,19 +9,59 @@ interface SettingField {
   placeholder?: string;
 }
 
-const SETTINGS_FIELDS: SettingField[] = [
-  { key: 'studio_name', label: 'Название студии', placeholder: 'Rosa Flowers' },
-  { key: 'phone', label: 'Телефон', type: 'tel', placeholder: '+7 (999) 123-45-67' },
-  { key: 'email', label: 'Email', type: 'email', placeholder: 'info@rosaflowers.ru' },
-  { key: 'address', label: 'Адрес', placeholder: 'г. Москва, ул. Цветочная, 1' },
-  { key: 'work_hours', label: 'Часы работы', placeholder: '09:00 - 21:00' },
-  { key: 'delivery_price', label: 'Стоимость доставки', type: 'number', placeholder: '500' },
-  { key: 'free_delivery_from', label: 'Бесплатная доставка от', type: 'number', placeholder: '5000' },
-  { key: 'min_order', label: 'Минимальный заказ', type: 'number', placeholder: '1000' },
-  { key: 'bonus_percent', label: 'Процент бонусов', type: 'number', placeholder: '5' },
-  { key: 'max_bonus_discount', label: 'Макс. скидка бонусами (%)', type: 'number', placeholder: '20' },
-  { key: 'telegram_channel', label: 'Telegram канал', placeholder: '@rosaflowers' },
-  { key: 'instagram', label: 'Instagram', placeholder: '@rosaflowers' },
+interface SettingSection {
+  title: string;
+  icon: typeof Building2;
+  color: string;
+  bg: string;
+  fields: SettingField[];
+}
+
+const SECTIONS: SettingSection[] = [
+  {
+    title: 'Бизнес',
+    icon: Building2,
+    color: 'text-blue-600',
+    bg: 'bg-blue-50',
+    fields: [
+      { key: 'studio_name', label: 'Название студии', placeholder: 'Роза цветов' },
+      { key: 'phone', label: 'Телефон', type: 'tel', placeholder: '+7 (917) 876-59-58' },
+      { key: 'email', label: 'Email', type: 'email', placeholder: 'rozacvetov@list.ru' },
+      { key: 'address', label: 'Адрес', placeholder: 'д. Званка, ул. Приозёрная, д. 58' },
+      { key: 'work_hours', label: 'Часы работы', placeholder: '09:00 – 21:00' },
+    ],
+  },
+  {
+    title: 'Доставка',
+    icon: Truck,
+    color: 'text-orange-600',
+    bg: 'bg-orange-50',
+    fields: [
+      { key: 'delivery_price', label: 'Стоимость доставки (₽)', type: 'number', placeholder: '300' },
+      { key: 'free_delivery_from', label: 'Бесплатная доставка от (₽)', type: 'number', placeholder: '3000' },
+      { key: 'min_order', label: 'Минимальный заказ (₽)', type: 'number', placeholder: '1000' },
+    ],
+  },
+  {
+    title: 'Программа лояльности',
+    icon: Star,
+    color: 'text-primary',
+    bg: 'bg-pink-50',
+    fields: [
+      { key: 'bonus_percent', label: 'Процент кэшбэка (%)', type: 'number', placeholder: '5' },
+      { key: 'max_bonus_discount', label: 'Макс. скидка бонусами (%)', type: 'number', placeholder: '20' },
+    ],
+  },
+  {
+    title: 'Соц. сети',
+    icon: Share2,
+    color: 'text-purple-600',
+    bg: 'bg-purple-50',
+    fields: [
+      { key: 'telegram_channel', label: 'Telegram канал', placeholder: '@rozacvetov' },
+      { key: 'instagram', label: 'Instagram', placeholder: '@rozacvetov' },
+    ],
+  },
 ];
 
 export default function Settings() {
@@ -35,7 +75,6 @@ export default function Settings() {
     api
       .get('/settings')
       .then(({ data }) => {
-        // Handle if data is wrapped in an object
         const settingsObj =
           typeof data === 'object' && !Array.isArray(data)
             ? data.settings || data
@@ -48,7 +87,6 @@ export default function Settings() {
 
   const handleChange = (key: string, value: string) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
-    // Clear success when editing
     if (success) setSuccess(false);
   };
 
@@ -61,7 +99,6 @@ export default function Settings() {
     try {
       await api.put('/settings', settings);
       setSuccess(true);
-      // Auto-hide success after 3 seconds
       setTimeout(() => setSuccess(false), 3000);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Ошибка сохранения настроек');
@@ -80,7 +117,7 @@ export default function Settings() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Настройки</h1>
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">Настройки</h1>
 
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg">
@@ -95,37 +132,52 @@ export default function Settings() {
         </div>
       )}
 
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5"
-      >
-        {SETTINGS_FIELDS.map((field) => (
-          <div key={field.key}>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              {field.label}
-            </label>
-            {field.type === 'textarea' ? (
-              <textarea
-                value={settings[field.key] || ''}
-                onChange={(e) => handleChange(field.key, e.target.value)}
-                placeholder={field.placeholder}
-                rows={3}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none"
-              />
-            ) : (
-              <input
-                type={field.type || 'text'}
-                value={settings[field.key] || ''}
-                onChange={(e) => handleChange(field.key, e.target.value)}
-                placeholder={field.placeholder}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
-              />
-            )}
-          </div>
-        ))}
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {SECTIONS.map((section) => {
+          const Icon = section.icon;
+          return (
+            <div key={section.title} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              {/* Section Header */}
+              <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
+                <div className={`w-8 h-8 rounded-lg ${section.bg} flex items-center justify-center`}>
+                  <Icon size={16} className={section.color} />
+                </div>
+                <h2 className="text-base font-semibold text-gray-800">{section.title}</h2>
+              </div>
 
-        {/* Actions */}
-        <div className="pt-4 border-t border-gray-100">
+              {/* Fields */}
+              <div className="p-6 space-y-4">
+                {section.fields.map((field) => (
+                  <div key={field.key}>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      {field.label}
+                    </label>
+                    {field.type === 'textarea' ? (
+                      <textarea
+                        value={settings[field.key] || ''}
+                        onChange={(e) => handleChange(field.key, e.target.value)}
+                        placeholder={field.placeholder}
+                        rows={3}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none"
+                      />
+                    ) : (
+                      <input
+                        type={field.type || 'text'}
+                        value={settings[field.key] || ''}
+                        onChange={(e) => handleChange(field.key, e.target.value)}
+                        placeholder={field.placeholder}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Save Button */}
+        <div className="flex justify-end">
           <button
             type="submit"
             disabled={saving}
