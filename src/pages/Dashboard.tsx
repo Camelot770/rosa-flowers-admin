@@ -63,10 +63,12 @@ export default function Dashboard() {
   const [data, setData] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const [error, setError] = useState('');
+
   useEffect(() => {
     api.get('/analytics')
       .then((res) => setData(res.data))
-      .catch(console.error)
+      .catch(() => setError('Не удалось загрузить аналитику'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -78,8 +80,12 @@ export default function Dashboard() {
     );
   }
 
-  if (!data) {
-    return <div className="text-center text-gray-500 py-12">Не удалось загрузить аналитику</div>;
+  if (error || !data) {
+    return (
+      <div className="p-4 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg">
+        {error || 'Не удалось загрузить аналитику'}
+      </div>
+    );
   }
 
   const newOrdersCount = data.ordersByStatus.find((s) => s.status === 'new')?.count || 0;

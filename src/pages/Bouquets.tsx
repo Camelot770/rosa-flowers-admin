@@ -46,12 +46,14 @@ export default function Bouquets() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [error, setError] = useState('');
 
   const fetchBouquets = () => {
     setLoading(true);
+    setError('');
     api.get('/bouquets')
       .then((res) => setBouquets(res.data))
-      .catch(console.error)
+      .catch(() => setError('Не удалось загрузить букеты'))
       .finally(() => setLoading(false));
   };
 
@@ -64,8 +66,8 @@ export default function Bouquets() {
     try {
       await api.delete(`/bouquets/${id}`);
       fetchBouquets();
-    } catch (err) {
-      console.error(err);
+    } catch {
+      setError('Не удалось удалить букет');
     }
   };
 
@@ -75,8 +77,9 @@ export default function Bouquets() {
       setBouquets((prev) =>
         prev.map((b) => (b.id === id ? { ...b, [field]: value } : b))
       );
-    } catch (err) {
-      console.error(err);
+    } catch {
+      setError('Не удалось обновить статус');
+      fetchBouquets();
     }
   };
 
@@ -103,6 +106,10 @@ export default function Bouquets() {
           Добавить букет
         </button>
       </div>
+
+      {error && (
+        <div className="p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg">{error}</div>
+      )}
 
       {/* Filters */}
       <div className="flex items-center gap-3">
