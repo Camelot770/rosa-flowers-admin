@@ -113,10 +113,11 @@ export default function Orders() {
 
   const fetchOrders = (status: string) => {
     setLoading(true);
+    setError('');
     const params = status === 'all' ? {} : { status };
     api.get('/orders', { params })
       .then((res) => setOrders(res.data))
-      .catch(console.error)
+      .catch(() => setError('Не удалось загрузить заказы'))
       .finally(() => setLoading(false));
   };
 
@@ -133,9 +134,8 @@ export default function Orders() {
       if (selectedOrder?.id === orderId) {
         setSelectedOrder((prev) => prev ? { ...prev, status: newStatus } : null);
       }
-    } catch (err) {
-      console.error(err);
-      setError(`Не удалось обновить статус заказа #${orderId}`);
+    } catch (err: any) {
+      setError(err.response?.data?.error || `Не удалось обновить статус заказа #${orderId}`);
     } finally {
       setUpdatingId(null);
     }

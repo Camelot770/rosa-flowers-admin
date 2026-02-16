@@ -10,6 +10,7 @@ export default function Broadcast() {
 
   const handleSend = async () => {
     if (!message.trim()) return;
+    if (!window.confirm('Отправить рассылку всем пользователям?')) return;
     setSending(true);
     setError('');
     setResult(null);

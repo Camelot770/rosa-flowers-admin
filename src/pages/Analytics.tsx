@@ -31,11 +31,11 @@ const PIE_COLORS = ['#E91E63', '#9C27B0', '#3F51B5', '#00BCD4', '#4CAF50', '#FF9
 
 const STATUS_LABELS: Record<string, string> = {
   new: 'Новый',
-  confirmed: 'Подтвержден',
+  confirmed: 'Подтверждён',
   preparing: 'Готовится',
-  delivering: 'Доставляется',
-  completed: 'Завершен',
-  canceled: 'Отменен',
+  delivering: 'В доставке',
+  completed: 'Выполнен',
+  canceled: 'Отменён',
 };
 
 export default function Analytics() {
