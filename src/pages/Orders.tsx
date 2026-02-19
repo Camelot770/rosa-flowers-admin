@@ -132,7 +132,12 @@ export default function Orders() {
       await api.put(`/orders/${orderId}/status`, { status: newStatus });
       fetchOrders(activeTab);
       if (selectedOrder?.id === orderId) {
-        setSelectedOrder((prev) => prev ? { ...prev, status: newStatus } : null);
+        try {
+          const { data } = await api.get(`/orders/${orderId}`);
+          setSelectedOrder(data);
+        } catch {
+          setSelectedOrder((prev) => prev ? { ...prev, status: newStatus } : null);
+        }
       }
     } catch (err: any) {
       setError(err.response?.data?.error || `Не удалось обновить статус заказа #${orderId}`);

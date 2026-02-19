@@ -76,9 +76,7 @@ export default function Settings() {
       .get('/settings')
       .then(({ data }) => {
         const settingsObj =
-          typeof data === 'object' && !Array.isArray(data)
-            ? data.settings || data
-            : {};
+          typeof data === 'object' && !Array.isArray(data) ? data : {};
         setSettings(settingsObj);
       })
       .catch(() => setError('Ошибка загрузки настроек'))
@@ -101,7 +99,7 @@ export default function Settings() {
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Ошибка сохранения настроек');
+      setError(err.response?.data?.error || err.response?.data?.message || 'Ошибка сохранения настроек');
     } finally {
       setSaving(false);
     }
