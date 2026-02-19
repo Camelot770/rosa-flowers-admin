@@ -18,15 +18,13 @@ interface BouquetData {
 }
 
 const CATEGORIES = [
+  { value: 'stabilized', label: 'Стабилизированные' },
   { value: 'roses', label: 'Розы' },
   { value: 'tulips', label: 'Тюльпаны' },
   { value: 'author', label: 'Авторские' },
   { value: 'peonies', label: 'Пионы' },
   { value: 'exotic', label: 'Экзотические' },
   { value: 'mixed', label: 'Микс' },
-  { value: 'lilies', label: 'Лилии' },
-  { value: 'hydrangea', label: 'Гортензии' },
-  { value: 'greenery', label: 'Зелень' },
 ];
 
 const initialData: BouquetData = {
@@ -34,7 +32,7 @@ const initialData: BouquetData = {
   description: '',
   price: '',
   oldPrice: '',
-  category: 'roses',
+  category: 'stabilized',
   tags: '',
   inStock: true,
   isHit: false,
@@ -49,7 +47,8 @@ export default function BouquetForm() {
 
   const [form, setForm] = useState<BouquetData>(initialData);
   const [images, setImages] = useState<File[]>([]);
-  const [existingImages, setExistingImages] = useState<string[]>([]);
+  const [existingImages, setExistingImages] = useState<{ id: number; url: string }[]>([]);
+  const [originalImageIds, setOriginalImageIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState('');
@@ -78,7 +77,12 @@ export default function BouquetForm() {
         });
         if (bouquet.images) {
           const imgs = Array.isArray(bouquet.images) ? bouquet.images : [bouquet.images];
-          setExistingImages(imgs.map((img: any) => typeof img === 'string' ? img : img.url));
+          const mapped = imgs.map((img: any) => ({
+            id: img.id,
+            url: typeof img === 'string' ? img : img.url,
+          }));
+          setExistingImages(mapped);
+          setOriginalImageIds(mapped.map((m: { id: number }) => m.id));
         }
       })
       .catch(() => setError('Ошибка загрузки букета'))
@@ -136,8 +140,11 @@ export default function BouquetForm() {
       fd.append('isNew', String(form.isNew));
       fd.append('sortOrder', form.sortOrder);
 
-      if (existingImages.length > 0) {
-        fd.append('existingImages', JSON.stringify(existingImages));
+      // Вычисляем удалённые изображения (были в оригинале, но убраны пользователем)
+      const currentIds = existingImages.map((img) => img.id);
+      const deletedIds = originalImageIds.filter((origId) => !currentIds.includes(origId));
+      if (deletedIds.length > 0) {
+        fd.append('deleteImages', JSON.stringify(deletedIds));
       }
 
       images.forEach((file) => {
@@ -152,7 +159,7 @@ export default function BouquetForm() {
 
       navigate('/bouquets');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Ошибка сохранения букета');
+      setError(err.response?.data?.error || err.response?.data?.message || 'Ошибка сохранения букета');
     } finally {
       setLoading(false);
     }
@@ -334,9 +341,9 @@ export default function BouquetForm() {
           {/* Existing images */}
           {existingImages.length > 0 && (
             <div className="flex flex-wrap gap-3 mb-3">
-              {existingImages.map((src, i) => (
-                <div key={i} className="relative w-24 h-24 rounded-lg overflow-hidden border border-gray-200">
-                  <img src={src} alt="" className="w-full h-full object-cover" />
+              {existingImages.map((img, i) => (
+                <div key={img.id} className="relative w-24 h-24 rounded-lg overflow-hidden border border-gray-200">
+                  <img src={img.url} alt="" className="w-full h-full object-cover" />
                   <button
                     type="button"
                     onClick={() => removeExistingImage(i)}

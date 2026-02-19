@@ -21,7 +21,7 @@ export default function Login({ onLogin }: Props) {
       localStorage.setItem('rosa_admin_token', data.token);
       onLogin();
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Ошибка входа. Проверьте логин и пароль.');
+      setError(err.response?.data?.error || err.response?.data?.message || 'Ошибка входа. Проверьте логин и пароль.');
     } finally {
       setLoading(false);
     }

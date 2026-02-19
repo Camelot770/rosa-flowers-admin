@@ -26,14 +26,14 @@ interface LoyaltyEntry {
   id: number;
   amount: number;
   type: string;
-  description: string | null;
+  description: string;
   createdAt: string;
 }
 
 interface UserDetail extends UserItem {
   orders: UserOrder[];
   loyaltyHistory: LoyaltyEntry[];
-  addresses: { id: number; city: string | null; street: string | null; house: string | null; apartment: string | null }[];
+  addresses: { id: number; title: string; street: string; house: string; apartment: string | null; entrance: string | null; floor: string | null }[];
 }
 
 const statusLabels: Record<string, string> = {
@@ -311,7 +311,10 @@ export default function Users() {
                         <div key={addr.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                           <MapPin size={16} className="text-gray-400 shrink-0" />
                           <p className="text-sm text-gray-700">
-                            {[addr.city, addr.street, addr.house, addr.apartment ? `кв. ${addr.apartment}` : null]
+                            {[addr.title, addr.street, addr.house,
+                              addr.apartment ? `кв. ${addr.apartment}` : null,
+                              addr.entrance ? `подъезд ${addr.entrance}` : null,
+                              addr.floor ? `этаж ${addr.floor}` : null]
                               .filter(Boolean)
                               .join(', ') || '---'}
                           </p>

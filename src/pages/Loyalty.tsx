@@ -16,7 +16,7 @@ interface HistoryEntry {
   id: number;
   amount: number;
   type: string;
-  description: string | null;
+  description: string;
   createdAt: string;
 }
 
@@ -71,7 +71,7 @@ export default function Loyalty() {
 
     try {
       const { data } = await api.get(`/loyalty/${user.id}`);
-      setHistory(Array.isArray(data) ? data : data.history || []);
+      setHistory(data.history || []);
     } catch {
       setError('Ошибка загрузки истории');
     } finally {
@@ -100,7 +100,7 @@ export default function Loyalty() {
 
       await fetchUsers();
       const { data } = await api.get(`/loyalty/${selectedUser.id}`);
-      setHistory(Array.isArray(data) ? data : data.history || []);
+      setHistory(data.history || []);
 
       setSelectedUser((prev) =>
         prev ? { ...prev, bonusPoints: prev.bonusPoints + Number(adjustAmount) } : null
@@ -110,7 +110,7 @@ export default function Loyalty() {
       setAdjustDescription('');
       setShowAdjust(false);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Ошибка корректировки баллов');
+      setError(err.response?.data?.error || err.response?.data?.message || 'Ошибка корректировки баллов');
     } finally {
       setAdjusting(false);
     }
