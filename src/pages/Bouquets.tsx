@@ -20,6 +20,7 @@ interface Bouquet {
 }
 
 const CATEGORIES: Record<string, string> = {
+  stabilized: 'Стабилизированные',
   roses: 'Розы',
   tulips: 'Тюльпаны',
   author: 'Авторские',

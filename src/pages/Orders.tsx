@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Search, X, Truck, Store, CreditCard, Eye, User, MapPin, Clock, Gift, MessageSquare, Star, RefreshCw } from 'lucide-react';
 import api from '../api/client';
 import { imageUrl } from '../utils/image';
@@ -112,26 +112,28 @@ export default function Orders() {
   const [search, setSearch] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
-  const fetchOrders = useCallback((status: string, silent = false) => {
+  const [allOrders, setAllOrders] = useState<Order[]>([]);
+
+  const fetchOrders = useCallback((silent = false) => {
     if (!silent) setLoading(true);
     setError('');
-    const params = status === 'all' ? {} : { status };
-    api.get('/orders', { params })
-      .then((res) => setOrders(res.data))
+    api.get('/orders')
+      .then((res) => setAllOrders(res.data))
       .catch(() => { if (!silent) setError('Не удалось загрузить заказы'); })
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
-    fetchOrders(activeTab);
-  }, [activeTab, fetchOrders]);
+    fetchOrders();
+  }, [fetchOrders]);
+
+  // Filter orders by active tab
+  const orders = activeTab === 'all' ? allOrders : allOrders.filter((o) => o.status === activeTab);
 
   // Auto-refresh every 30 seconds
-  const activeTabRef = useRef(activeTab);
-  activeTabRef.current = activeTab;
   useEffect(() => {
     const interval = setInterval(() => {
-      fetchOrders(activeTabRef.current, true);
+      fetchOrders(true);
     }, 30_000);
     return () => clearInterval(interval);
   }, [fetchOrders]);
@@ -141,7 +143,7 @@ export default function Orders() {
     setError('');
     try {
       await api.put(`/orders/${orderId}/status`, { status: newStatus });
-      fetchOrders(activeTab);
+      fetchOrders();
       if (selectedOrder?.id === orderId) {
         try {
           const { data } = await api.get(`/orders/${orderId}`);
@@ -171,7 +173,7 @@ export default function Orders() {
   });
 
   const statusCounts: Record<string, number> = {};
-  orders.forEach((o) => {
+  allOrders.forEach((o) => {
     statusCounts[o.status] = (statusCounts[o.status] || 0) + 1;
   });
 
@@ -181,7 +183,7 @@ export default function Orders() {
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold text-gray-800">Заказы</h1>
           <button
-            onClick={() => fetchOrders(activeTab)}
+            onClick={() => fetchOrders()}
             className="p-2 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-colors"
             title="Обновить"
           >
@@ -203,7 +205,7 @@ export default function Orders() {
       {/* Status Tabs */}
       <div className="flex flex-wrap gap-2">
         {statuses.map((status) => {
-          const count = status === 'all' ? orders.length : statusCounts[status] || 0;
+          const count = status === 'all' ? allOrders.length : statusCounts[status] || 0;
           return (
             <button
               key={status}
@@ -328,8 +330,8 @@ export default function Orders() {
 
       {/* Order Detail Modal */}
       {selectedOrder && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center p-4 pt-12 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl">
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center p-4 pt-12 overflow-y-auto" onClick={() => setSelectedOrder(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between p-5 border-b border-gray-100">
               <div className="flex items-center gap-3 flex-wrap">
                 <h2 className="text-lg font-bold text-gray-900">Заказ #{selectedOrder.id}</h2>
