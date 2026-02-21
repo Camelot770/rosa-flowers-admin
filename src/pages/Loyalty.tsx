@@ -9,7 +9,9 @@ interface LoyaltyUser {
   username?: string;
   phone?: string;
   bonusPoints: number;
-  telegramId: string;
+  telegramId?: string | null;
+  maxId?: string | null;
+  platform?: string;
 }
 
 interface HistoryEntry {
@@ -52,7 +54,9 @@ export default function Loyalty() {
         username: u.username,
         phone: u.phone,
         bonusPoints: u.bonusPoints,
-        telegramId: u.telegramId?.toString() || '',
+        telegramId: u.telegramId || null,
+        maxId: u.maxId || null,
+        platform: u.telegramId ? 'telegram' : u.maxId ? 'max' : 'unknown',
       })));
     } catch {
       setError('Ошибка загрузки пользователей');
@@ -179,6 +183,7 @@ export default function Loyalty() {
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/50">
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Имя</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Платформа</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Username</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Телефон</th>
                 <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Бонусные баллы</th>
@@ -194,6 +199,11 @@ export default function Loyalty() {
                 >
                   <td className="px-4 py-3 text-sm font-medium text-gray-900">
                     {[user.firstName, user.lastName].filter(Boolean).join(' ') || '---'}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${user.telegramId ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                      {user.telegramId ? '📱 TG' : '💬 Max'}
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
                     {user.username ? `@${user.username}` : '---'}

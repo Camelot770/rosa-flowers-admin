@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Search, X, Truck, Store, CreditCard, Eye, User, MapPin, Clock, Gift, MessageSquare, Star } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Search, X, Truck, Store, CreditCard, Eye, User, MapPin, Clock, Gift, MessageSquare, Star, RefreshCw } from 'lucide-react';
 import api from '../api/client';
 import { imageUrl } from '../utils/image';
 
@@ -9,7 +9,8 @@ interface OrderUser {
   lastName?: string;
   username?: string;
   phone?: string;
-  telegramId: string;
+  telegramId?: string | null;
+  maxId?: string | null;
 }
 
 interface OrderAddress {
@@ -111,19 +112,29 @@ export default function Orders() {
   const [search, setSearch] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
-  const fetchOrders = (status: string) => {
-    setLoading(true);
+  const fetchOrders = useCallback((status: string, silent = false) => {
+    if (!silent) setLoading(true);
     setError('');
     const params = status === 'all' ? {} : { status };
     api.get('/orders', { params })
       .then((res) => setOrders(res.data))
-      .catch(() => setError('Не удалось загрузить заказы'))
+      .catch(() => { if (!silent) setError('Не удалось загрузить заказы'); })
       .finally(() => setLoading(false));
-  };
+  }, []);
 
   useEffect(() => {
     fetchOrders(activeTab);
-  }, [activeTab]);
+  }, [activeTab, fetchOrders]);
+
+  // Auto-refresh every 30 seconds
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchOrders(activeTabRef.current, true);
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [fetchOrders]);
 
   const handleStatusChange = async (orderId: number, newStatus: string) => {
     setUpdatingId(orderId);
@@ -167,7 +178,16 @@ export default function Orders() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-800">Заказы</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-gray-800">Заказы</h1>
+          <button
+            onClick={() => fetchOrders(activeTab)}
+            className="p-2 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-colors"
+            title="Обновить"
+          >
+            <RefreshCw size={16} />
+          </button>
+        </div>
         <div className="relative">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
@@ -242,7 +262,12 @@ export default function Orders() {
                     <tr key={order.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => setSelectedOrder(order)}>
                       <td className="px-4 py-3 font-medium text-gray-800">#{order.id}</td>
                       <td className="px-4 py-3">
-                        <div className="text-gray-800 font-medium">{customerName}</div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-gray-800 font-medium">{customerName}</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${order.user.telegramId ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}`}>
+                            {order.user.telegramId ? 'TG' : 'Max'}
+                          </span>
+                        </div>
                         {order.user.phone && <div className="text-xs text-gray-400">{order.user.phone}</div>}
                       </td>
                       <td className="px-4 py-3 text-gray-600">
@@ -346,7 +371,13 @@ export default function Orders() {
                   <div><span className="text-gray-400">Имя:</span> <span className="font-medium">{[selectedOrder.user.firstName, selectedOrder.user.lastName].filter(Boolean).join(' ')}</span></div>
                   {selectedOrder.user.username && <div><span className="text-gray-400">Username:</span> <span className="font-medium">@{selectedOrder.user.username}</span></div>}
                   {selectedOrder.user.phone && <div><span className="text-gray-400">Телефон:</span> <span className="font-medium">{selectedOrder.user.phone}</span></div>}
-                  <div><span className="text-gray-400">Telegram ID:</span> <span className="font-medium">{selectedOrder.user.telegramId}</span></div>
+                  <div>
+                    <span className="text-gray-400">Платформа:</span>{' '}
+                    <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${selectedOrder.user.telegramId ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                      {selectedOrder.user.telegramId ? '📱 Telegram' : '💬 Max'}
+                    </span>
+                    <span className="ml-2 font-mono text-xs text-gray-400">{selectedOrder.user.telegramId || selectedOrder.user.maxId}</span>
+                  </div>
                 </div>
               </div>
 
