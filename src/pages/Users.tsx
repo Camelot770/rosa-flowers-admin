@@ -67,6 +67,7 @@ export default function Users() {
   const [users, setUsers] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [error, setError] = useState('');
 
   // Detail modal
   const [selectedUser, setSelectedUser] = useState<UserDetail | null>(null);
@@ -76,7 +77,7 @@ export default function Users() {
   useEffect(() => {
     api.get('/users')
       .then(({ data }) => setUsers(Array.isArray(data) ? data : []))
-      .catch(console.error)
+      .catch(() => setError('Не удалось загрузить клиентов'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -120,6 +121,10 @@ export default function Users() {
         <h1 className="text-2xl font-bold text-gray-800">Клиенты</h1>
         <span className="text-sm text-gray-500">{filtered.length} из {users.length}</span>
       </div>
+
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg">{error}</div>
+      )}
 
       {/* Search */}
       <div className="relative mb-4">
@@ -213,7 +218,7 @@ export default function Users() {
                       <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${selectedUser.telegramId ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
                         {selectedUser.telegramId ? '📱 TG' : '💬 Max'}
                       </span>
-                      <span className="font-mono text-xs text-gray-400">{selectedUser.telegramId || (selectedUser as any).maxId}</span>
+                      <span className="font-mono text-xs text-gray-400">{selectedUser.telegramId || selectedUser.maxId}</span>
                     </div>
                   </div>
                   <button onClick={() => setSelectedUser(null)} className="p-2 hover:bg-gray-100 rounded-lg">

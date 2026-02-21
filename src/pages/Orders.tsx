@@ -104,15 +104,13 @@ function formatRubles(amount: number): string {
 }
 
 export default function Orders() {
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('all');
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-
-  const [allOrders, setAllOrders] = useState<Order[]>([]);
 
   const fetchOrders = useCallback((silent = false) => {
     if (!silent) setLoading(true);
