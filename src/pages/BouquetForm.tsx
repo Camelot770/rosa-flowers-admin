@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, FormEvent, ChangeEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Upload, X, Loader2 } from 'lucide-react';
 import api from '../api/client';
+import { imageUrl } from '../utils/image';
 
 interface BouquetData {
   id?: string;
@@ -23,8 +24,11 @@ const CATEGORIES = [
   { value: 'tulips', label: 'Тюльпаны' },
   { value: 'author', label: 'Авторские' },
   { value: 'peonies', label: 'Пионы' },
-  { value: 'exotic', label: 'Экзотические' },
+  { value: 'exotic', label: 'Экзотика' },
   { value: 'mixed', label: 'Микс' },
+  { value: 'lilies', label: 'Лилии' },
+  { value: 'hydrangea', label: 'Гортензии' },
+  { value: 'greenery', label: 'Зелень' },
 ];
 
 const initialData: BouquetData = {
@@ -343,7 +347,7 @@ export default function BouquetForm() {
             <div className="flex flex-wrap gap-3 mb-3">
               {existingImages.map((img, i) => (
                 <div key={img.id} className="relative w-24 h-24 rounded-lg overflow-hidden border border-gray-200">
-                  <img src={img.url} alt="" className="w-full h-full object-cover" />
+                  <img src={imageUrl(img.url)} alt="" className="w-full h-full object-cover" />
                   <button
                     type="button"
                     onClick={() => removeExistingImage(i)}
