@@ -4,7 +4,9 @@ import api from '../api/client';
 
 interface UserItem {
   id: number;
-  telegramId: string;
+  telegramId?: string | null;
+  maxId?: string | null;
+  platform?: string;
   firstName: string | null;
   lastName: string | null;
   username: string | null;
@@ -99,7 +101,8 @@ export default function Users() {
       name.includes(q) ||
       (u.username || '').toLowerCase().includes(q) ||
       (u.phone || '').includes(q) ||
-      u.telegramId.includes(q)
+      (u.telegramId || '').includes(q) ||
+      (u.maxId || '').includes(q)
     );
   });
 
@@ -125,7 +128,7 @@ export default function Users() {
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Поиск по имени, username, телефону, Telegram ID..."
+          placeholder="Поиск по имени, username, телефону, ID..."
           className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
         />
         {search && (
@@ -149,7 +152,7 @@ export default function Users() {
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Клиент</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Username</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Телефон</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Telegram ID</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Платформа</th>
                   <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Заказы</th>
                   <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Бонусы</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Дата рег.</th>
@@ -169,7 +172,12 @@ export default function Users() {
                       {user.username ? `@${user.username}` : '---'}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">{user.phone || '---'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-400 font-mono text-xs">{user.telegramId}</td>
+                    <td className="px-4 py-3">
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${user.telegramId ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                        {user.telegramId ? '📱 Telegram' : '💬 Max'}
+                      </span>
+                      <div className="text-[10px] text-gray-400 font-mono mt-0.5">{user.telegramId || user.maxId}</div>
+                    </td>
                     <td className="px-4 py-3 text-sm text-right font-medium text-gray-700">{user.ordersCount}</td>
                     <td className="px-4 py-3 text-sm text-right font-semibold text-primary">{user.bonusPoints}</td>
                     <td className="px-4 py-3 text-sm text-gray-500">
@@ -202,7 +210,10 @@ export default function Users() {
                     <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
                       {selectedUser.username && <span>@{selectedUser.username}</span>}
                       {selectedUser.phone && <span>{selectedUser.phone}</span>}
-                      <span className="font-mono text-xs text-gray-400">TG: {selectedUser.telegramId}</span>
+                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${selectedUser.telegramId ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                        {selectedUser.telegramId ? '📱 TG' : '💬 Max'}
+                      </span>
+                      <span className="font-mono text-xs text-gray-400">{selectedUser.telegramId || (selectedUser as any).maxId}</span>
                     </div>
                   </div>
                   <button onClick={() => setSelectedUser(null)} className="p-2 hover:bg-gray-100 rounded-lg">
