@@ -1,5 +1,5 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { Loader2, Save, CheckCircle, Building2, Truck, Star, Share2 } from 'lucide-react';
+import { Loader2, Save, CheckCircle, Building2, Truck, Star, Share2, LayoutDashboard } from 'lucide-react';
 import api from '../api/client';
 
 interface SettingField {
@@ -18,6 +18,18 @@ interface SettingSection {
 }
 
 const SECTIONS: SettingSection[] = [
+  {
+    title: 'Шапка сайта',
+    icon: LayoutDashboard,
+    color: 'text-rose-600',
+    bg: 'bg-rose-50',
+    fields: [
+      { key: 'hero_title', label: 'Заголовок', placeholder: 'Роза цветов' },
+      { key: 'hero_subtitle', label: 'Подзаголовок', placeholder: 'Студия стабилизированной флористики' },
+      { key: 'hero_description', label: 'Описание', type: 'textarea', placeholder: 'Живые цветы, которые не вянут. Букеты, которые остаются надолго — с доставкой по городу.' },
+      { key: 'hero_delivery_text', label: 'Текст доставки (бейдж)', placeholder: 'Доставка 1-3 ч' },
+    ],
+  },
   {
     title: 'Бизнес',
     icon: Building2,
