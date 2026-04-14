@@ -56,6 +56,7 @@ export default function BouquetForm() {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState('');
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -179,6 +180,27 @@ export default function BouquetForm() {
 
   return (
     <div className="max-w-3xl mx-auto">
+      {/* Fullscreen image preview */}
+      {previewUrl && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center cursor-pointer"
+          onClick={() => setPreviewUrl(null)}
+        >
+          <button
+            onClick={() => setPreviewUrl(null)}
+            className="absolute top-4 right-4 z-50 w-10 h-10 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-colors"
+          >
+            <X size={22} className="text-white" />
+          </button>
+          <img
+            src={previewUrl}
+            alt=""
+            className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <button
@@ -347,7 +369,12 @@ export default function BouquetForm() {
             <div className="flex flex-wrap gap-3 mb-3">
               {existingImages.map((img, i) => (
                 <div key={img.id} className="relative w-24 h-24 rounded-lg overflow-hidden border border-gray-200">
-                  <img src={imageUrl(img.url)} alt="" className="w-full h-full object-cover" />
+                  <img
+                    src={imageUrl(img.url)}
+                    alt=""
+                    className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => setPreviewUrl(imageUrl(img.url))}
+                  />
                   <button
                     type="button"
                     onClick={() => removeExistingImage(i)}
@@ -368,7 +395,8 @@ export default function BouquetForm() {
                   <img
                     src={imagePreviewUrls[i]}
                     alt=""
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => setPreviewUrl(imagePreviewUrls[i])}
                   />
                   <button
                     type="button"
