@@ -15,6 +15,7 @@ interface BouquetData {
   inStock: boolean;
   isHit: boolean;
   isNew: boolean;
+  customOrder: boolean;
   sortOrder: string;
 }
 
@@ -41,6 +42,7 @@ const initialData: BouquetData = {
   inStock: true,
   isHit: false,
   isNew: false,
+  customOrder: false,
   sortOrder: '0',
 };
 
@@ -78,6 +80,7 @@ export default function BouquetForm() {
           inStock: bouquet.inStock !== false,
           isHit: bouquet.isHit || false,
           isNew: bouquet.isNew || false,
+          customOrder: bouquet.customOrder || false,
           sortOrder: String(bouquet.sortOrder || 0),
         });
         if (bouquet.images) {
@@ -143,6 +146,7 @@ export default function BouquetForm() {
       fd.append('inStock', String(form.inStock));
       fd.append('isHit', String(form.isHit));
       fd.append('isNew', String(form.isNew));
+      fd.append('customOrder', String(form.customOrder));
       fd.append('sortOrder', form.sortOrder);
 
       // Вычисляем удалённые изображения (были в оригинале, но убраны пользователем)
@@ -357,6 +361,17 @@ export default function BouquetForm() {
               className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary/30 accent-primary"
             />
             <span className="text-sm font-medium text-gray-700">Новинка</span>
+          </label>
+
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              name="customOrder"
+              checked={form.customOrder}
+              onChange={handleChange}
+              className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary/30 accent-primary"
+            />
+            <span className="text-sm font-medium text-gray-700">Под заказ</span>
           </label>
         </div>
 
