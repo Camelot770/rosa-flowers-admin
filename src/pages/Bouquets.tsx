@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import { imageUrl } from '../utils/image';
-import { Plus, Pencil, Trash2, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, X } from 'lucide-react';
 
 interface BouquetImage {
   url: string;
@@ -16,6 +16,7 @@ interface Bouquet {
   inStock: boolean;
   isHit: boolean;
   isNew: boolean;
+  customOrder: boolean;
   images: BouquetImage[];
 }
 
@@ -48,6 +49,7 @@ export default function Bouquets() {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [error, setError] = useState('');
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const fetchBouquets = () => {
     setLoading(true);
@@ -72,7 +74,7 @@ export default function Bouquets() {
     }
   };
 
-  const handleToggle = async (id: number, field: 'inStock' | 'isHit' | 'isNew', value: boolean) => {
+  const handleToggle = async (id: number, field: 'inStock' | 'isHit' | 'isNew' | 'customOrder', value: boolean) => {
     try {
       await api.patch(`/bouquets/${id}/toggle`, { field, value });
       setBouquets((prev) =>
@@ -94,6 +96,27 @@ export default function Bouquets() {
 
   return (
     <div className="space-y-6">
+      {/* Fullscreen image preview */}
+      {previewUrl && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center cursor-pointer"
+          onClick={() => setPreviewUrl(null)}
+        >
+          <button
+            onClick={() => setPreviewUrl(null)}
+            className="absolute top-4 right-4 z-50 w-10 h-10 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-colors"
+          >
+            <X size={22} className="text-white" />
+          </button>
+          <img
+            src={previewUrl}
+            alt=""
+            className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold text-gray-800">Букеты</h1>
@@ -148,7 +171,7 @@ export default function Bouquets() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10 shadow-sm">
                 <tr>
                   <th className="text-left px-4 py-3 font-medium text-gray-500">Фото</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-500">Название</th>
@@ -157,6 +180,7 @@ export default function Bouquets() {
                   <th className="text-center px-4 py-3 font-medium text-gray-500">В наличии</th>
                   <th className="text-center px-4 py-3 font-medium text-gray-500">Хит</th>
                   <th className="text-center px-4 py-3 font-medium text-gray-500">Новинка</th>
+                  <th className="text-center px-4 py-3 font-medium text-gray-500">Под заказ</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-500">Действия</th>
                 </tr>
               </thead>
@@ -167,7 +191,12 @@ export default function Bouquets() {
                     <tr key={b.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3">
                         {thumbUrl ? (
-                          <img src={thumbUrl} alt={b.name} className="w-12 h-12 object-cover rounded-lg border border-gray-200" />
+                          <img
+                            src={thumbUrl}
+                            alt={b.name}
+                            className="w-12 h-12 object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-80 hover:border-primary transition-all"
+                            onClick={() => setPreviewUrl(thumbUrl)}
+                          />
                         ) : (
                           <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400 text-xs">Нет</div>
                         )}
@@ -197,6 +226,14 @@ export default function Bouquets() {
                           className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${b.isNew ? 'bg-green-500' : 'bg-gray-300'}`}
                         >
                           <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${b.isNew ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} />
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={() => handleToggle(b.id, 'customOrder', !b.customOrder)}
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${b.customOrder ? 'bg-blue-500' : 'bg-gray-300'}`}
+                        >
+                          <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${b.customOrder ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} />
                         </button>
                       </td>
                       <td className="px-4 py-3">
