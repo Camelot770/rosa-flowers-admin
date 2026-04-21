@@ -53,7 +53,7 @@ function App() {
         localStorage.removeItem('rosa_admin_token');
         setIsAuth(false);
       }} />
-      <main className="flex-1 p-6 ml-64 overflow-auto">
+      <main className="flex-1 p-6 ml-64">
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/bouquets" element={<Bouquets />} />
