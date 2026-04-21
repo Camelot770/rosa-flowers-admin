@@ -159,7 +159,7 @@ export default function Bouquets() {
         </select>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-gray-200">
         {loading ? (
           <div className="flex items-center justify-center h-40">
             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
@@ -169,19 +169,19 @@ export default function Bouquets() {
             {bouquets.length === 0 ? 'Букетов пока нет' : 'Ничего не найдено'}
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div>
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10 shadow-sm">
-                <tr>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">Фото</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">Название</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">Цена</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">Категория</th>
-                  <th className="text-center px-4 py-3 font-medium text-gray-500">В наличии</th>
-                  <th className="text-center px-4 py-3 font-medium text-gray-500">Хит</th>
-                  <th className="text-center px-4 py-3 font-medium text-gray-500">Новинка</th>
-                  <th className="text-center px-4 py-3 font-medium text-gray-500">Под заказ</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-500">Действия</th>
+              <thead className="sticky top-0 z-10">
+                <tr className="bg-gray-50 border-b border-gray-200 shadow-sm">
+                  <th className="text-left px-4 py-3 font-medium text-gray-500 bg-gray-50 first:rounded-tl-xl">Фото</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-500 bg-gray-50">Название</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-500 bg-gray-50">Цена</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-500 bg-gray-50">Категория</th>
+                  <th className="text-center px-4 py-3 font-medium text-gray-500 bg-gray-50">В наличии</th>
+                  <th className="text-center px-4 py-3 font-medium text-gray-500 bg-gray-50">Хит</th>
+                  <th className="text-center px-4 py-3 font-medium text-gray-500 bg-gray-50">Новинка</th>
+                  <th className="text-center px-4 py-3 font-medium text-gray-500 bg-gray-50">Под заказ</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-500 bg-gray-50 last:rounded-tr-xl">Действия</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
