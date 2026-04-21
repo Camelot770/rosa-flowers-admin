@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import { imageUrl } from '../utils/image';
-import { Plus, Pencil, Trash2, Search, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface BouquetImage {
   url: string;
@@ -50,6 +50,8 @@ export default function Bouquets() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [error, setError] = useState('');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   const fetchBouquets = () => {
     setLoading(true);
@@ -93,6 +95,16 @@ export default function Bouquets() {
     }
     return true;
   });
+
+  // Reset to first page when filters or page size change
+  useEffect(() => {
+    setPage(1);
+  }, [search, categoryFilter, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const startIndex = (currentPage - 1) * pageSize;
+  const paginated = filtered.slice(startIndex, startIndex + pageSize);
 
   return (
     <div className="space-y-6">
@@ -185,7 +197,7 @@ export default function Bouquets() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filtered.map((b) => {
+                {paginated.map((b) => {
                   const thumbUrl = b.images?.[0] ? imageUrl(b.images[0].url) : null;
                   return (
                     <tr key={b.id} className="hover:bg-gray-50 transition-colors">
@@ -254,6 +266,72 @@ export default function Bouquets() {
           </div>
         )}
       </div>
+
+      {/* Pagination */}
+      {!loading && filtered.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <span>На странице:</span>
+            <select
+              value={pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value))}
+              className="px-2 py-1 border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={30}>30</option>
+            </select>
+            <span className="text-gray-400">
+              {startIndex + 1}–{Math.min(startIndex + pageSize, filtered.length)} из {filtered.length}
+            </span>
+          </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="p-2 rounded-lg text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft size={16} />
+              </button>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                .reduce<(number | 'dots')[]>((acc, p, idx, arr) => {
+                  if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('dots');
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, i) =>
+                  p === 'dots' ? (
+                    <span key={`dots-${i}`} className="px-2 text-gray-400">…</span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => setPage(p)}
+                      className={`min-w-[32px] h-8 px-2 rounded-lg text-sm font-medium transition-colors ${
+                        p === currentPage
+                          ? 'bg-primary text-white'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  )
+                )}
+
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="p-2 rounded-lg text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
