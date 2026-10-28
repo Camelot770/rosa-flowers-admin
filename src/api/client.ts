@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://rosa-cvetov-camelot770.amvera.io';
+const API_URL = import.meta.env.VITE_API_URL || 'https://roza-cvetov-camelot770.msk1.amvera.tech';
 
 const api = axios.create({
   baseURL: `${API_URL}/api/admin`,
