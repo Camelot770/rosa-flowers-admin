@@ -27,7 +27,7 @@ interface AnalyticsData {
   topBouquets: { name: string; count: number }[];
 }
 
-const PIE_COLORS = ['#E91E63', '#9C27B0', '#3F51B5', '#00BCD4', '#4CAF50', '#FF9800', '#795548'];
+const PIE_COLORS = ['#C8421E', '#9C27B0', '#3F51B5', '#00BCD4', '#4CAF50', '#FF9800', '#795548'];
 
 const STATUS_LABELS: Record<string, string> = {
   new: 'Новый',
@@ -134,8 +134,8 @@ export default function Analytics() {
             <AreaChart data={data.revenueByDay}>
               <defs>
                 <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#E91E63" stopOpacity={0.2} />
-                  <stop offset="95%" stopColor="#E91E63" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#C8421E" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="#C8421E" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -165,7 +165,7 @@ export default function Analytics() {
               <Area
                 type="monotone"
                 dataKey="revenue"
-                stroke="#E91E63"
+                stroke="#C8421E"
                 strokeWidth={2}
                 fill="url(#revenueGradient)"
               />
@@ -236,7 +236,7 @@ export default function Analytics() {
                   }}
                   formatter={(value: number) => [value, 'Продаж']}
                 />
-                <Bar dataKey="count" fill="#E91E63" radius={[0, 4, 4, 0]} barSize={24} />
+                <Bar dataKey="count" fill="#C8421E" radius={[0, 4, 4, 0]} barSize={24} />
               </BarChart>
             </ResponsiveContainer>
           </div>
