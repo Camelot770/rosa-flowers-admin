@@ -72,7 +72,7 @@ export default function Analytics() {
       label: 'Выручка',
       value: `${(data.totalRevenue || 0).toLocaleString('ru-RU')} \u20BD`,
       icon: TrendingUp,
-      color: 'bg-pink-50 text-pink-600',
+      color: 'bg-paper-2 text-vermilion',
     },
     {
       label: 'Заказы',

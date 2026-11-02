@@ -235,7 +235,7 @@ export default function Users() {
                       <p className="font-bold text-gray-800">{selectedUser.orders?.length || 0}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 p-2.5 bg-pink-50 rounded-lg">
+                  <div className="flex items-center gap-2 p-2.5 bg-paper-2 rounded-lg">
                     <Star size={16} className="text-primary" />
                     <div>
                       <p className="text-xs text-gray-500">Бонусы</p>

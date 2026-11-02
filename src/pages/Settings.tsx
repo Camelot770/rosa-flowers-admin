@@ -1,5 +1,5 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { Loader2, Save, CheckCircle, Building2, Truck, Star, Share2, LayoutDashboard } from 'lucide-react';
+import { Loader2, Save, CheckCircle, Building2, Truck, Star, Share2 } from 'lucide-react';
 import api from '../api/client';
 
 interface SettingField {
@@ -18,18 +18,6 @@ interface SettingSection {
 }
 
 const SECTIONS: SettingSection[] = [
-  {
-    title: 'Шапка сайта',
-    icon: LayoutDashboard,
-    color: 'text-rose-600',
-    bg: 'bg-rose-50',
-    fields: [
-      { key: 'hero_title', label: 'Заголовок', placeholder: 'Роза цветов' },
-      { key: 'hero_subtitle', label: 'Подзаголовок', placeholder: 'Студия стабилизированной флористики' },
-      { key: 'hero_description', label: 'Описание', type: 'textarea', placeholder: 'Живые цветы, которые не вянут. Букеты, которые остаются надолго — с доставкой по городу.' },
-      { key: 'hero_delivery_text', label: 'Текст доставки (бейдж)', placeholder: 'Доставка 1-3 ч' },
-    ],
-  },
   {
     title: 'Бизнес',
     icon: Building2,
@@ -58,7 +46,7 @@ const SECTIONS: SettingSection[] = [
     title: 'Программа лояльности',
     icon: Star,
     color: 'text-primary',
-    bg: 'bg-pink-50',
+    bg: 'bg-paper-2',
     fields: [
       { key: 'bonus_percent', label: 'Процент кэшбэка (%)', type: 'number', placeholder: '5' },
       { key: 'max_bonus_discount', label: 'Макс. скидка бонусами (%)', type: 'number', placeholder: '20' },
@@ -71,6 +59,7 @@ const SECTIONS: SettingSection[] = [
     bg: 'bg-purple-50',
     fields: [
       { key: 'telegram_channel', label: 'Telegram канал', placeholder: '@rozacvetov' },
+      { key: 'max_channel', label: 'Канал в Max (полная ссылка)', placeholder: 'https://max.ru/...' },
       { key: 'instagram', label: 'Instagram', placeholder: '@rozacvetov' },
     ],
   },

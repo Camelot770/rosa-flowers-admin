@@ -94,7 +94,7 @@ export default function Dashboard() {
     { label: 'Всего заказов', value: data.totalOrders, icon: ShoppingCart, color: 'text-blue-600', bg: 'bg-blue-50', link: '/orders' },
     { label: 'Заказы сегодня', value: data.todayOrders, icon: CalendarDays, color: 'text-green-600', bg: 'bg-green-50', link: '/orders' },
     { label: 'Заказы за месяц', value: data.monthOrders, icon: CalendarRange, color: 'text-purple-600', bg: 'bg-purple-50', link: '/orders' },
-    { label: 'Пользователи', value: data.totalUsers, icon: Users, color: 'text-pink-600', bg: 'bg-pink-50', link: '/users' },
+    { label: 'Пользователи', value: data.totalUsers, icon: Users, color: 'text-vermilion', bg: 'bg-paper-2', link: '/users' },
     { label: 'Общая выручка', value: formatRubles(data.totalRevenue), icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50', link: '/analytics' },
     { label: 'Выручка за месяц', value: formatRubles(data.monthRevenue), icon: TrendingUp, color: 'text-orange-600', bg: 'bg-orange-50', link: '/analytics' },
   ];
