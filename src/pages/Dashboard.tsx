@@ -1,76 +1,132 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../api/client';
 import {
-  ShoppingCart, CalendarDays, CalendarRange, Users,
-  DollarSign, TrendingUp, Package, Crown, Bell, ChevronRight,
+  AlertTriangle, CalendarClock, ChevronRight, Clock, Crown, CreditCard, Flame, MapPin, Package, Store, Truck,
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
+import { dayLabel, formatRubles, plural, studioDate } from '../utils/format';
+import { Order, isOverdue, plainAddress, statusColors, statusLabel, statusLabels } from '../utils/orders';
+import { useOrderSummary } from '../components/OrderSummary';
 
 interface RecentOrder {
   id: number;
   status: string;
   totalPrice: number;
-  paymentStatus: string;
   customerName: string;
   createdAt: string;
 }
 
 interface Analytics {
-  totalOrders: number;
-  todayOrders: number;
-  monthOrders: number;
   totalUsers: number;
-  totalRevenue: number;
+  todayRevenue: number;
   monthRevenue: number;
+  monthPaidOrders: number;
+  period: { averageCheck: number };
+  catalog: {
+    total: number;
+    onSale: number;
+    noPhoto: number;
+    featured: { id: number; name: string; available: boolean } | null;
+  };
   revenueByDay: { date: string; revenue: number }[];
   topBouquets: { name: string; count: number }[];
-  ordersByStatus: { status: string; count: number }[];
   recentOrders: RecentOrder[];
 }
 
-const statusLabels: Record<string, string> = {
-  new: 'Новый',
-  confirmed: 'Подтверждён',
-  preparing: 'Готовится',
-  delivering: 'В доставке',
-  completed: 'Выполнен',
-  canceled: 'Отменён',
+const shortDate = (date: string) => {
+  const [, month, day] = date.split('-');
+  return `${Number(day)}.${month}`;
 };
 
-const statusColors: Record<string, string> = {
-  new: 'bg-blue-100 text-blue-700',
-  confirmed: 'bg-indigo-100 text-indigo-700',
-  preparing: 'bg-yellow-100 text-yellow-700',
-  delivering: 'bg-orange-100 text-orange-700',
-  completed: 'bg-green-100 text-green-700',
-  canceled: 'bg-red-100 text-red-700',
-};
+function Tile({ to, label, value, hint, icon, tone = 'default' }: {
+  to: string;
+  label: string;
+  value: number | string;
+  hint?: string;
+  icon: ReactNode;
+  tone?: 'default' | 'alert';
+}) {
+  const alert = tone === 'alert';
+  return (
+    <Link
+      to={to}
+      className={`rounded-xl border p-4 transition-shadow hover:shadow-sm ${
+        alert ? 'bg-red-600 border-red-600 text-white' : 'bg-white border-gray-200 hover:border-primary/30'
+      }`}
+    >
+      <div className={`flex items-center gap-2 text-sm ${alert ? 'text-white/90' : 'text-gray-500'}`}>
+        {icon}
+        {label}
+      </div>
+      <p className={`text-3xl font-semibold mt-1 ${alert ? 'text-white' : 'text-gray-800'}`}>{value}</p>
+      {hint && <p className={`text-xs mt-0.5 ${alert ? 'text-white/80' : 'text-gray-500'}`}>{hint}</p>}
+    </Link>
+  );
+}
 
-function formatRubles(amount: number): string {
-  return new Intl.NumberFormat('ru-RU', {
-    style: 'currency',
-    currency: 'RUB',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
+function Metric({ label, value, className = '' }: { label: string; value: string | number; className?: string }) {
+  return (
+    <div className={`bg-white rounded-xl border border-gray-200 p-4 ${className}`}>
+      <p className="text-xs text-gray-500">{label}</p>
+      <p className="text-lg font-semibold text-gray-800 mt-0.5 whitespace-nowrap">{value}</p>
+    </div>
+  );
+}
+
+function DeliveryRow({ order }: { order: Order }) {
+  const overdue = isOverdue(order);
+  const pill = statusColors[order.status] || 'bg-gray-100 text-gray-600';
+  return (
+    <Link
+      to={`/orders?order=${order.id}`}
+      className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
+    >
+      <div className={`w-[5.5rem] shrink-0 text-sm ${overdue ? 'text-red-600 font-medium' : 'text-gray-700'}`}>
+        <div className="flex items-center gap-1">
+          {order.deliveryType === 'pickup' ? <Store size={13} className="text-gray-400" /> : <Truck size={13} className="text-gray-400" />}
+          {overdue ? dayLabel(order.deliveryDate) : order.deliveryTime?.split('—')[0].trim() || 'Без времени'}
+        </div>
+        {overdue && order.deliveryTime && <div className="text-xs">{order.deliveryTime.split('—')[0].trim()}</div>}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-gray-800 truncate">
+          #{order.id} {order.items.map((item) => item.name).join(', ')}
+        </p>
+        <p className="text-xs text-gray-500 flex items-start gap-1">
+          {order.address ? <><MapPin size={11} className="shrink-0 mt-0.5" /><span className="line-clamp-2">{plainAddress(order.address)}</span></> : 'Самовывоз'}
+        </p>
+        <span className={`sm:hidden inline-block mt-1 text-[11px] font-medium px-2 py-0.5 rounded-full ${pill}`}>{statusLabel(order)}</span>
+      </div>
+      <span className={`hidden sm:inline text-[11px] font-medium px-2 py-0.5 rounded-full shrink-0 ${pill}`}>
+        {statusLabel(order)}
+      </span>
+    </Link>
+  );
 }
 
 export default function Dashboard() {
-  const navigate = useNavigate();
+  const { summary } = useOrderSummary();
   const [data, setData] = useState<Analytics | null>(null);
+  const [active, setActive] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-
   const [error, setError] = useState('');
 
   useEffect(() => {
     api.get('/analytics')
       .then((res) => setData(res.data))
-      .catch(() => setError('Не удалось загрузить аналитику'))
+      .catch(() => setError('Не удалось загрузить цифры'))
       .finally(() => setLoading(false));
   }, []);
+
+  // The counters update on their own, the list follows them
+  useEffect(() => {
+    api.get('/orders', { params: { status: 'active' } })
+      .then((res) => setActive(res.data))
+      .catch(() => setError('Не удалось загрузить заказы'));
+  }, [summary]);
 
   if (loading) {
     return (
@@ -80,183 +136,196 @@ export default function Dashboard() {
     );
   }
 
-  if (error || !data) {
-    return (
-      <div className="p-4 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg">
-        {error || 'Не удалось загрузить аналитику'}
-      </div>
-    );
-  }
-
-  const newOrdersCount = data.ordersByStatus.find((s) => s.status === 'new')?.count || 0;
-
-  const statCards = [
-    { label: 'Всего заказов', value: data.totalOrders, icon: ShoppingCart, color: 'text-blue-600', bg: 'bg-blue-50', link: '/orders' },
-    { label: 'Заказы сегодня', value: data.todayOrders, icon: CalendarDays, color: 'text-green-600', bg: 'bg-green-50', link: '/orders' },
-    { label: 'Заказы за месяц', value: data.monthOrders, icon: CalendarRange, color: 'text-purple-600', bg: 'bg-purple-50', link: '/orders' },
-    { label: 'Пользователи', value: data.totalUsers, icon: Users, color: 'text-vermilion', bg: 'bg-paper-2', link: '/users' },
-    { label: 'Общая выручка', value: formatRubles(data.totalRevenue), icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50', link: '/analytics' },
-    { label: 'Выручка за месяц', value: formatRubles(data.monthRevenue), icon: TrendingUp, color: 'text-orange-600', bg: 'bg-orange-50', link: '/analytics' },
-  ];
+  const byTime = (a: Order, b: Order) => (parseInt(a.deliveryTime || '') || 99) - (parseInt(b.deliveryTime || '') || 99);
+  const overdue = active.filter(isOverdue).sort((a, b) => (a.deliveryDate! < b.deliveryDate! ? -1 : 1));
+  const today = active.filter((order) => order.deliveryDate === studioDate()).sort(byTime);
+  const featured = data?.catalog.featured;
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-800">Дашборд</h1>
+      <div className="flex items-baseline justify-between gap-3">
+        <h1 className="text-2xl font-bold text-gray-800">Сегодня</h1>
+        <span className="text-sm text-gray-500">
+          {new Date(`${studioDate()}T12:00:00`).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', weekday: 'long' })}
+        </span>
+      </div>
 
-      {/* New Orders Alert */}
-      {newOrdersCount > 0 && (
-        <button
-          onClick={() => navigate('/orders')}
-          className="w-full flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl hover:bg-blue-100 transition-colors text-left"
-        >
-          <div className="w-10 h-10 bg-blue-500 text-white rounded-full flex items-center justify-center shrink-0">
-            <Bell size={18} />
-          </div>
-          <div className="flex-1">
-            <p className="font-semibold text-blue-800">
-              {newOrdersCount} {newOrdersCount === 1 ? 'новый заказ' : newOrdersCount < 5 ? 'новых заказа' : 'новых заказов'}
-            </p>
-            <p className="text-sm text-blue-600">Требуют подтверждения</p>
-          </div>
-          <ChevronRight size={18} className="text-blue-400" />
-        </button>
+      {error && <div className="p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg">{error}</div>}
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Tile
+          to="/orders"
+          label="В работе"
+          value={summary?.active ?? '...'}
+          hint={summary?.toStart ? `не начато: ${summary.toStart}` : undefined}
+          icon={<Package size={15} />}
+        />
+        <Tile
+          to="/orders?date=today"
+          label="Доставки сегодня"
+          value={summary?.deliveriesToday ?? '...'}
+          hint={summary?.deliveriesTomorrow ? `завтра: ${summary.deliveriesTomorrow}` : undefined}
+          icon={<CalendarClock size={15} />}
+        />
+        <Tile
+          to="/orders?date=overdue"
+          label="Просрочены"
+          value={summary?.overdue ?? '...'}
+          icon={<Flame size={15} />}
+          tone={summary?.overdue ? 'alert' : 'default'}
+        />
+        <Tile
+          to="/orders?view=new"
+          label="Ждут оплаты"
+          value={summary?.awaitingPayment ?? '...'}
+          icon={<CreditCard size={15} />}
+        />
+      </div>
+
+      {featured && !featured.available && (
+        <Link to={`/bouquets/${featured.id}`} className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg hover:bg-amber-100 transition-colors">
+          <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+          Букет на обложке «{featured.name}» не в наличии, клиенты видят на обложке другой.
+        </Link>
+      )}
+      {!!data?.catalog.noPhoto && (
+        <Link to="/bouquets?filter=nophoto" className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg hover:bg-amber-100 transition-colors">
+          <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+          {plural(data.catalog.noPhoto, 'Букет', 'Букета', 'Букетов')} без фото: {data.catalog.noPhoto}. Откройте список, чтобы добавить.
+        </Link>
       )}
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {statCards.map((card) => {
-          const Icon = card.icon;
-          return (
-            <button
-              key={card.label}
-              onClick={() => navigate(card.link)}
-              className="bg-white rounded-xl border border-gray-200 p-5 flex items-center gap-4 hover:border-primary/30 hover:shadow-sm transition-all text-left"
-            >
-              <div className={`w-12 h-12 rounded-lg ${card.bg} flex items-center justify-center`}>
-                <Icon size={22} className={card.color} />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">{card.label}</p>
-                <p className="text-xl font-bold text-gray-800">{card.value}</p>
-              </div>
-            </button>
-          );
-        })}
-      </div>
+      {/* What has to happen today */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {overdue.length > 0 && (
+          <section className="bg-white rounded-xl border border-red-200 overflow-hidden lg:col-span-2">
+            <h2 className="px-4 py-3 text-base text-red-600 border-b border-red-100 flex items-center gap-2">
+              <Flame size={16} />
+              Просроченные доставки
+            </h2>
+            <div className="divide-y divide-gray-100">
+              {overdue.map((order) => <DeliveryRow key={order.id} order={order} />)}
+            </div>
+          </section>
+        )}
 
-      {/* Revenue Chart */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-800 mb-4">Выручка по дням</h2>
-        <ResponsiveContainer width="100%" height={300}>
-          <AreaChart data={data.revenueByDay}>
-            <defs>
-              <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#C8421E" stopOpacity={0.2} />
-                <stop offset="95%" stopColor="#C8421E" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis
-              dataKey="date"
-              tick={{ fontSize: 12 }}
-              tickFormatter={(val) => {
-                const d = new Date(val);
-                return `${d.getDate()}.${String(d.getMonth() + 1).padStart(2, '0')}`;
-              }}
-            />
-            <YAxis tick={{ fontSize: 12 }} tickFormatter={(val) => `${(val / 1000).toFixed(0)}k`} />
-            <Tooltip
-              formatter={(value: number) => [formatRubles(value), 'Выручка']}
-              labelFormatter={(label) => new Date(label).toLocaleDateString('ru-RU')}
-            />
-            <Area type="monotone" dataKey="revenue" stroke="#C8421E" strokeWidth={2} fill="url(#revenueGradient)" />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
+        <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-2">
+            <h2 className="text-base text-gray-800 flex items-center gap-2">
+              <Clock size={16} className="text-primary" />
+              Доставки сегодня
+            </h2>
+            {!!summary?.deliveriesTomorrow && (
+              <Link to="/orders?date=tomorrow" className="text-xs font-medium text-primary hover:underline flex items-center">
+                Завтра: {summary.deliveriesTomorrow} <ChevronRight size={14} />
+              </Link>
+            )}
+          </div>
+          {today.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-8">На сегодня доставок нет</p>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {today.map((order) => <DeliveryRow key={order.id} order={order} />)}
+            </div>
+          )}
+        </section>
 
-      {/* Bottom Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Orders */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-              <Package size={18} className="text-primary" />
+        <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <h2 className="text-base text-gray-800 flex items-center gap-2">
+              <Package size={16} className="text-primary" />
               Последние заказы
             </h2>
-            <button onClick={() => navigate('/orders')} className="text-sm text-primary font-medium hover:underline">
-              Все
-            </button>
+            <Link to="/orders?view=all&sort=newest" className="text-xs font-medium text-primary hover:underline">Все</Link>
           </div>
-          <div className="space-y-3">
-            {(data.recentOrders || []).map((order) => (
-              <button
+          <div className="divide-y divide-gray-100">
+            {(data?.recentOrders || []).map((order) => (
+              <Link
                 key={order.id}
-                onClick={() => navigate('/orders')}
-                className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 transition-colors text-left"
+                to={`/orders?view=all&sort=newest&order=${order.id}`}
+                className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
               >
-                <div>
-                  <p className="text-sm font-medium text-gray-800">#{order.id} {order.customerName}</p>
-                  <p className="text-xs text-gray-400">{new Date(order.createdAt).toLocaleDateString('ru-RU')}</p>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-800 truncate">#{order.id} {order.customerName}</p>
+                  <p className="text-xs text-gray-500">{new Date(order.createdAt).toLocaleDateString('ru-RU')}</p>
                 </div>
-                <div className="text-right">
+                <div className="text-right shrink-0">
                   <p className="text-sm font-semibold text-gray-800">{formatRubles(order.totalPrice)}</p>
                   <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${statusColors[order.status] || 'bg-gray-100 text-gray-600'}`}>
                     {statusLabels[order.status] || order.status}
                   </span>
                 </div>
-              </button>
+              </Link>
             ))}
-            {(!data.recentOrders || data.recentOrders.length === 0) && (
-              <p className="text-sm text-gray-400 text-center py-4">Нет заказов</p>
+            {(!data?.recentOrders || data.recentOrders.length === 0) && (
+              <p className="text-sm text-gray-500 text-center py-8">Заказов пока нет</p>
             )}
           </div>
-        </div>
-
-        {/* Top Bouquets */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-            <Crown size={18} className="text-primary" />
-            Топ букетов
-          </h2>
-          <div className="space-y-3">
-            {data.topBouquets.map((item, idx) => (
-              <div key={item.name} className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">
-                    {idx + 1}
-                  </span>
-                  <span className="text-sm text-gray-700">{item.name}</span>
-                </div>
-                <span className="text-sm font-medium text-gray-500">{item.count} шт.</span>
-              </div>
-            ))}
-            {data.topBouquets.length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-4">Нет данных</p>
-            )}
-          </div>
-        </div>
-
-        {/* Orders by Status */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-            <Package size={18} className="text-primary" />
-            Заказы по статусам
-          </h2>
-          <div className="space-y-3">
-            {data.ordersByStatus.map((item) => (
-              <div key={item.status} className="flex items-center justify-between">
-                <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${statusColors[item.status] || 'bg-gray-100 text-gray-600'}`}>
-                  {statusLabels[item.status] || item.status}
-                </span>
-                <span className="text-sm font-medium text-gray-700">{item.count}</span>
-              </div>
-            ))}
-            {data.ordersByStatus.length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-4">Нет данных</p>
-            )}
-          </div>
-        </div>
+        </section>
       </div>
+
+      {data && (
+        <>
+          {/* Money */}
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+            <Metric label="Выручка сегодня" value={formatRubles(data.todayRevenue)} />
+            <Metric label="Выручка за месяц" value={formatRubles(data.monthRevenue)} />
+            <Metric label="Оплачено за месяц" value={data.monthPaidOrders} />
+            <Metric label="Средний чек, 30 дней" value={data.period.averageCheck ? formatRubles(data.period.averageCheck) : 'нет данных'} />
+            <Metric label="Клиенты" value={data.totalUsers} className="col-span-2 lg:col-span-1" />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <section className="bg-white rounded-xl border border-gray-200 p-4 lg:col-span-2 min-w-0">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-base text-gray-800">Выручка за 30 дней</h2>
+                <Link to="/analytics" className="text-xs font-medium text-primary hover:underline">Аналитика</Link>
+              </div>
+              <ResponsiveContainer width="100%" height={220}>
+                <AreaChart data={data.revenueByDay}>
+                  <defs>
+                    <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#C8421E" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#C8421E" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                  <XAxis dataKey="date" tick={{ fontSize: 12 }} minTickGap={24} tickFormatter={shortDate} />
+                  <YAxis tick={{ fontSize: 12 }} width={44} allowDecimals={false} tickFormatter={(val) => (val >= 1000 ? `${Math.round(val / 1000)}k` : val)} />
+                  <Tooltip
+                    formatter={(value: number) => [formatRubles(value), 'Выручка']}
+                    labelFormatter={(label) => dayLabel(label)}
+                  />
+                  <Area type="monotone" dataKey="revenue" stroke="#C8421E" strokeWidth={2} fill="url(#revenueGradient)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </section>
+
+            <section className="bg-white rounded-xl border border-gray-200 p-4">
+              <h2 className="text-base text-gray-800 mb-3 flex items-center gap-2">
+                <Crown size={16} className="text-primary" />
+                Что покупают
+              </h2>
+              <div className="space-y-2.5">
+                {data.topBouquets.slice(0, 6).map((item, idx) => (
+                  <div key={item.name} className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-xs font-semibold flex items-center justify-center shrink-0">
+                        {idx + 1}
+                      </span>
+                      <span className="text-sm text-gray-700 truncate">{item.name}</span>
+                    </div>
+                    <span className="text-sm font-medium text-gray-500 shrink-0">{item.count} шт.</span>
+                  </div>
+                ))}
+                {data.topBouquets.length === 0 && (
+                  <p className="text-sm text-gray-500 text-center py-4">Оплаченных заказов пока нет</p>
+                )}
+              </div>
+            </section>
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -1,523 +1,546 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Search, X, Truck, Store, CreditCard, Eye, User, MapPin, Clock, Gift, MessageSquare, Star, RefreshCw, AlertTriangle } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSearchParams, Link } from 'react-router-dom';
+import { Search, Truck, Store, RefreshCw, Download, Clock, MapPin, Gift, X } from 'lucide-react';
 import api from '../api/client';
 import { imageUrl } from '../utils/image';
 import { getPlatform } from '../utils/platform';
 import { formatAddress } from '../utils/address';
+import { downloadCsv } from '../utils/csv';
+import { dayLabel, formatRubles, isIsoDate, plural, studioDate, telHref } from '../utils/format';
+import {
+  ACTIVE_STATUSES, Order, customerName, isOverdue, nextStatus, nextStepLabel,
+  paymentColors, paymentLabels, plainAddress, statusColors, statusLabel,
+} from '../utils/orders';
+import { useOrderActions } from '../components/useOrderActions';
+import { useOrderSummary } from '../components/OrderSummary';
+import OrderDrawer from '../components/OrderDrawer';
 
-interface OrderUser {
-  id: number;
-  firstName: string;
-  lastName?: string;
-  username?: string;
-  phone?: string;
-  telegramId?: string | null;
-  maxId?: string | null;
+const VIEWS = [
+  { key: 'active', label: 'В работе' },
+  { key: 'new', label: 'Ждут оплаты' },
+  { key: 'confirmed', label: 'Подтверждённые' },
+  { key: 'preparing', label: 'Готовятся' },
+  { key: 'delivering', label: 'В доставке' },
+  { key: 'completed', label: 'Выполненные' },
+  { key: 'canceled', label: 'Отменённые' },
+  { key: 'all', label: 'Все' },
+];
+
+const DATE_CHIPS = [
+  { key: '', label: 'Любая дата' },
+  { key: 'today', label: 'Сегодня' },
+  { key: 'tomorrow', label: 'Завтра' },
+  { key: 'overdue', label: 'Просроченные' },
+];
+
+const PAGE_SIZE = 50;
+
+// Work is planned by the delivery day, finished orders are looked up by when they came in
+const WORK_VIEWS = ['active', 'confirmed', 'preparing', 'delivering'];
+
+function inView(order: Order, view: string): boolean {
+  if (view === 'all') return true;
+  if (view === 'active') return ACTIVE_STATUSES.includes(order.status);
+  return order.status === view;
 }
 
-interface OrderAddress {
-  id: number;
-  title: string;
-  street: string;
-  house: string;
-  apartment?: string;
-  entrance?: string;
-  floor?: string;
-  comment?: string | null;
+function onDate(order: Order, date: string): boolean {
+  if (!date) return true;
+  if (date === 'today') return order.deliveryDate === studioDate();
+  if (date === 'tomorrow') return order.deliveryDate === studioDate(1);
+  if (date === 'overdue') return isOverdue(order);
+  return order.deliveryDate === date;
 }
 
-interface OrderItem {
-  id: number;
-  name: string;
-  price: number;
-  quantity: number;
-  bouquet?: { images?: { url: string }[] } | null;
+function matchesSearch(order: Order, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const digits = q.replace(/\D/g, '');
+  const phones = [order.user.phone, order.recipientPhone].map((phone) => (phone || '').replace(/\D/g, ''));
+  if (digits.length >= 3 && phones.some((phone) => phone.includes(digits))) return true;
+  return [
+    `#${order.id}`,
+    customerName(order.user),
+    order.user.username,
+    order.recipientName,
+    order.comment,
+    order.adminNote,
+    order.cardText,
+    order.customerEmail,
+    order.address && formatAddress(order.address),
+    ...order.items.map((item) => item.name),
+  ].some((text) => (text || '').toLowerCase().includes(q));
 }
 
-interface Order {
-  id: number;
-  user: OrderUser;
-  address?: OrderAddress | null;
-  items: OrderItem[];
-  status: string;
-  deliveryType: string;
-  deliveryDate?: string;
-  deliveryTime?: string;
-  recipientName?: string;
-  recipientPhone?: string;
-  isAnonymous: boolean;
-  cardText?: string;
-  comment?: string;
-  totalPrice: number;
-  bonusUsed: number;
-  bonusEarned: number;
-  promoCode?: string | null;
-  promoDiscount?: number;
-  paymentStatus: string;
-  createdAt: string;
+function compareByDelivery(a: Order, b: Order): number {
+  const aDate = isIsoDate(a.deliveryDate) ? a.deliveryDate : '9999';
+  const bDate = isIsoDate(b.deliveryDate) ? b.deliveryDate : '9999';
+  if (aDate !== bDate) return aDate < bDate ? -1 : 1;
+  const start = (order: Order) => parseInt(order.deliveryTime || '') || 99;
+  return start(a) - start(b) || a.id - b.id;
 }
 
-const statuses = ['all', 'new', 'confirmed', 'preparing', 'delivering', 'completed', 'canceled'] as const;
-
-const statusLabels: Record<string, string> = {
-  all: 'Все',
-  new: 'Новый',
-  confirmed: 'Подтверждён',
-  preparing: 'Готовится',
-  delivering: 'В доставке',
-  completed: 'Выполнен',
-  canceled: 'Отменён',
-};
-
-const statusColors: Record<string, string> = {
-  new: 'bg-blue-100 text-blue-700',
-  confirmed: 'bg-indigo-100 text-indigo-700',
-  preparing: 'bg-yellow-100 text-yellow-700',
-  delivering: 'bg-orange-100 text-orange-700',
-  completed: 'bg-green-100 text-green-700',
-  canceled: 'bg-red-100 text-red-700',
-};
-
-const paymentColors: Record<string, string> = {
-  pending: 'bg-gray-100 text-gray-600',
-  paid: 'bg-green-100 text-green-700',
-  canceled: 'bg-red-100 text-red-600',
-};
-
-const paymentLabels: Record<string, string> = {
-  pending: 'Ожидает',
-  paid: 'Оплачен',
-  canceled: 'Отменён',
-};
-
-const nextStatuses: Record<string, string[]> = {
-  new: ['confirmed', 'canceled'],
-  confirmed: ['preparing', 'canceled'],
-  preparing: ['delivering', 'canceled'],
-  delivering: ['completed', 'canceled'],
-  completed: [],
-  canceled: [],
-};
-
-function formatRubles(amount: number): string {
-  return new Intl.NumberFormat('ru-RU', {
-    style: 'currency',
-    currency: 'RUB',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
+function NextStep({ order, busy, onClick, className = '' }: { order: Order; busy: boolean; onClick: () => void; className?: string }) {
+  if (!nextStatus(order)) return null;
+  return (
+    <button
+      disabled={busy}
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      className={`px-3 py-2 text-xs font-medium rounded-lg transition-colors whitespace-nowrap disabled:opacity-50 ${
+        order.status === 'new'
+          ? 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'
+          : 'bg-primary text-white hover:bg-primary/90'
+      } ${className}`}
+    >
+      {nextStepLabel(order)}
+    </button>
+  );
 }
 
-function cancelConfirmText(order: Order): string {
-  const lines = [`Отменить заказ #${order.id}? Вернуть его в работу будет нельзя.`];
-  if (order.bonusUsed > 0) lines.push(`Списанные бонусы (${order.bonusUsed}) вернутся клиенту.`);
-  if (order.paymentStatus === 'paid') lines.push(`Заказ уже оплачен: ${formatRubles(order.totalPrice)} нужно вернуть вручную в кабинете ЮKassa.`);
-  return lines.join('\n\n');
+function Thumb({ order }: { order: Order }) {
+  const src = order.items[0]?.bouquet?.images?.[0]?.url;
+  return (
+    <div className="w-12 h-12 rounded-lg bg-gray-100 shrink-0 overflow-hidden">
+      {src
+        ? <img src={imageUrl(src)} alt="" loading="lazy" className="w-full h-full object-cover" />
+        : <div className="w-full h-full flex items-center justify-center text-gray-300 text-xs">🌹</div>}
+    </div>
+  );
 }
 
-// The order does not store its delivery price, so it is what remains of the total after the discounts
-function orderBreakdown(order: Order) {
-  const itemsTotal = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const promoDiscount = order.promoDiscount || 0;
-  const deliveryPrice = order.totalPrice - (itemsTotal - promoDiscount - order.bonusUsed);
-  return { itemsTotal, promoDiscount, deliveryPrice };
+function Items({ order }: { order: Order }) {
+  return (
+    <div className="min-w-0">
+      {order.items.slice(0, 2).map((item) => (
+        <div key={item.id} className="truncate text-sm text-gray-800">{item.name}{item.quantity > 1 ? ` x${item.quantity}` : ''}</div>
+      ))}
+      {order.items.length > 2 && <div className="text-xs text-gray-400">и ещё {order.items.length - 2}</div>}
+    </div>
+  );
+}
+
+function Pills({ order }: { order: Order }) {
+  return (
+    <>
+      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColors[order.status] || 'bg-gray-100 text-gray-600'}`}>
+        {statusLabel(order)}
+      </span>
+      {order.status !== 'new' && order.paymentStatus !== 'paid' && (
+        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${paymentColors[order.paymentStatus] || 'bg-gray-100 text-gray-600'}`}>
+          {paymentLabels[order.paymentStatus] || order.paymentStatus}
+        </span>
+      )}
+      {isOverdue(order) && <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-600 text-white">Просрочен</span>}
+    </>
+  );
+}
+
+function When({ order }: { order: Order }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {order.deliveryType === 'pickup' ? <Store size={14} className="text-gray-400 shrink-0" /> : <Truck size={14} className="text-gray-400 shrink-0" />}
+      {order.deliveryTime || (order.deliveryType === 'pickup' ? 'Самовывоз' : 'Время не указано')}
+    </span>
+  );
+}
+
+interface RowProps {
+  order: Order;
+  busy: boolean;
+  onOpen: () => void;
+  onNext: () => void;
+  showDay: boolean;
+}
+
+function OrderCard({ order, busy, onOpen, onNext, showDay }: RowProps) {
+  return (
+    <article onClick={onOpen} className="bg-white rounded-xl border border-gray-200 p-4 space-y-3 cursor-pointer hover:border-primary/30 transition-colors">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-sm font-semibold text-gray-800 mr-1">#{order.id}</span>
+        <Pills order={order} />
+        <span className="text-sm font-semibold text-gray-800 ml-auto">{formatRubles(order.totalPrice)}</span>
+      </div>
+      <div className="flex items-center gap-3">
+        <Thumb order={order} />
+        <Items order={order} />
+      </div>
+      <div className="space-y-1 text-sm text-gray-600">
+        <div className={`flex items-center gap-1.5 ${isOverdue(order) ? 'text-red-600 font-medium' : ''}`}>
+          {showDay && <><Clock size={14} className="text-gray-400 shrink-0" />{dayLabel(order.deliveryDate)},</>}
+          <When order={order} />
+        </div>
+        {order.address && (
+          <div className="flex items-start gap-1.5">
+            <MapPin size={14} className="text-gray-400 shrink-0 mt-0.5" />
+            <span className="min-w-0 break-words">{plainAddress(order.address)}</span>
+          </div>
+        )}
+        {(order.recipientName || order.recipientPhone) && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Gift size={14} className="text-gray-400 shrink-0" />
+            {order.recipientName && <span>{order.recipientName}</span>}
+            {order.recipientPhone && (
+              <a href={telHref(order.recipientPhone)} onClick={(e) => e.stopPropagation()} className="font-medium text-primary">
+                {order.recipientPhone}
+              </a>
+            )}
+          </div>
+        )}
+      </div>
+      <NextStep order={order} busy={busy} onClick={onNext} className="w-full py-2.5 text-sm" />
+    </article>
+  );
+}
+
+function OrderRow({ order, busy, onOpen, onNext, showDay }: RowProps) {
+  const platform = getPlatform(order.user);
+  return (
+    <tr onClick={onOpen} className="hover:bg-gray-50 transition-colors cursor-pointer">
+      <td className={`px-3 py-3 whitespace-nowrap ${isOverdue(order) ? 'text-red-600 font-medium' : 'text-gray-700'}`}>
+        {showDay && <div className="font-medium">{dayLabel(order.deliveryDate)}</div>}
+        <When order={order} />
+      </td>
+      <td className="px-3 py-3">
+        <div className="flex items-center gap-3">
+          <Thumb order={order} />
+          <div className="min-w-0">
+            <div className="text-xs text-gray-500">#{order.id}</div>
+            <Items order={order} />
+          </div>
+        </div>
+      </td>
+      <td className="px-3 py-3">
+        {order.address
+          ? <div className="text-gray-700 line-clamp-2">{plainAddress(order.address)}</div>
+          : <div className="text-gray-500">Самовывоз</div>}
+        {order.recipientName && <div className="text-xs text-gray-500 truncate">Получатель: {order.recipientName}</div>}
+      </td>
+      <td className="px-3 py-3">
+        <div className="text-gray-800 font-medium truncate">{customerName(order.user)}</div>
+        <div className="flex items-center gap-1.5">
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${platform.soft}`}>{platform.tag}</span>
+          {order.user.phone && (
+            <a href={telHref(order.user.phone)} onClick={(e) => e.stopPropagation()} className="text-xs text-primary hover:underline truncate">{order.user.phone}</a>
+          )}
+        </div>
+      </td>
+      <td className="px-3 py-3">
+        <div className="font-medium text-gray-800 whitespace-nowrap mb-1">{formatRubles(order.totalPrice)}</div>
+        <div className="flex flex-wrap gap-1"><Pills order={order} /></div>
+      </td>
+      <td className="px-3 py-3 text-right">
+        <NextStep order={order} busy={busy} onClick={onNext} />
+      </td>
+    </tr>
+  );
 }
 
 export default function Orders() {
-  const [allOrders, setAllOrders] = useState<Order[]>([]);
+  const [params, setParams] = useSearchParams();
+  const view = params.get('view') || 'active';
+  const date = params.get('date') || '';
+  const openId = parseInt(params.get('order') || '') || null;
+  const sort = params.get('sort') || (WORK_VIEWS.includes(view) ? 'delivery' : 'newest');
+
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<string>('all');
-  const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [visible, setVisible] = useState(PAGE_SIZE);
+  const { summary } = useOrderSummary();
 
   const fetchOrders = useCallback((silent = false) => {
     if (!silent) setLoading(true);
-    setError('');
-    api.get('/orders')
-      .then((res) => setAllOrders(res.data))
+    return api.get('/orders')
+      .then((res) => { setOrders(res.data); setError(''); })
       .catch(() => { if (!silent) setError('Не удалось загрузить заказы'); })
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
     fetchOrders();
-  }, [fetchOrders]);
-
-  // Filter orders by active tab
-  const orders = activeTab === 'all' ? allOrders : allOrders.filter((o) => o.status === activeTab);
-
-  // Auto-refresh every 30 seconds
-  useEffect(() => {
     const interval = setInterval(() => {
-      fetchOrders(true);
+      if (!document.hidden) fetchOrders(true);
     }, 30_000);
     return () => clearInterval(interval);
   }, [fetchOrders]);
 
-  const handleStatusChange = async (orderId: number, newStatus: string) => {
-    setUpdatingId(orderId);
-    setError('');
-    try {
-      if (newStatus === 'canceled') {
-        // The customer may have paid since this list was loaded
-        const { data: fresh } = await api.get(`/orders/${orderId}`);
-        if (!window.confirm(cancelConfirmText(fresh))) return;
-      }
-      await api.put(`/orders/${orderId}/status`, { status: newStatus });
-      fetchOrders();
-      if (selectedOrder?.id === orderId) {
-        try {
-          const { data } = await api.get(`/orders/${orderId}`);
-          setSelectedOrder(data);
-        } catch {
-          setSelectedOrder((prev) => prev ? { ...prev, status: newStatus } : null);
-        }
-      }
-    } catch (err: any) {
-      setError(err.response?.data?.error || `Не удалось обновить статус заказа #${orderId}`);
-    } finally {
-      setUpdatingId(null);
-    }
+  useEffect(() => {
+    setVisible(PAGE_SIZE);
+  }, [view, date, sort, search]);
+
+  const { updatingId, advance } = useOrderActions(() => fetchOrders(true));
+
+  const setParam = (changes: Record<string, string | null>, push = false) => {
+    const next = new URLSearchParams(params);
+    Object.entries(changes).forEach(([key, value]) => {
+      if (value) next.set(key, value);
+      else next.delete(key);
+    });
+    setParams(next, { replace: !push });
   };
 
-  const filtered = orders.filter((o) => {
-    if (!search.trim()) return true;
-    const q = search.toLowerCase();
-    const name = [o.user.firstName, o.user.lastName].filter(Boolean).join(' ').toLowerCase();
-    return (
-      `#${o.id}`.includes(q) ||
-      String(o.id).includes(q) ||
-      name.includes(q) ||
-      (o.user.phone || '').includes(q) ||
-      (o.recipientPhone || '').includes(q)
+  const counts = useMemo(() => {
+    const result: Record<string, number> = {};
+    VIEWS.forEach(({ key }) => { result[key] = orders.filter((order) => inView(order, key)).length; });
+    return result;
+  }, [orders]);
+
+  const filtered = useMemo(() => {
+    const list = orders.filter((order) => inView(order, view) && onDate(order, date) && matchesSearch(order, search));
+    return sort === 'delivery'
+      ? [...list].sort(compareByDelivery)
+      : [...list].sort((a, b) => b.id - a.id);
+  }, [orders, view, date, search, sort]);
+
+  const shown = filtered.slice(0, visible);
+
+  // Under the delivery sort the day becomes a heading, so rows repeat only the time
+  const groups = useMemo(() => {
+    if (sort !== 'delivery') return [{ key: 'all', label: '', orders: shown }];
+    const result: { key: string; label: string; orders: Order[] }[] = [];
+    shown.forEach((order) => {
+      const key = order.deliveryDate || '';
+      const last = result[result.length - 1];
+      if (last && last.key === key) last.orders.push(order);
+      else result.push({ key, label: dayLabel(order.deliveryDate), orders: [order] });
+    });
+    return result;
+  }, [shown, sort]);
+
+  const exportCsv = () => {
+    downloadCsv(
+      `Заказы ${studioDate()}.csv`,
+      ['Заказ', 'Статус', 'Оплата', 'Дата доставки', 'Время', 'Способ', 'Адрес', 'Получатель', 'Телефон получателя', 'Клиент', 'Телефон клиента', 'Состав', 'Сумма', 'Создан', 'Заметка студии'],
+      filtered.map((order) => [
+        order.id,
+        statusLabel(order),
+        paymentLabels[order.paymentStatus] || order.paymentStatus,
+        order.deliveryDate,
+        order.deliveryTime,
+        order.deliveryType === 'pickup' ? 'Самовывоз' : 'Доставка',
+        order.address ? plainAddress(order.address) : '',
+        order.recipientName,
+        order.recipientPhone,
+        customerName(order.user),
+        order.user.phone,
+        order.items.map((item) => `${item.name} x${item.quantity}`).join(', '),
+        order.totalPrice,
+        new Date(order.createdAt).toLocaleString('ru-RU'),
+        order.adminNote,
+      ]),
     );
-  });
+  };
 
-  const statusCounts: Record<string, number> = {};
-  allOrders.forEach((o) => {
-    statusCounts[o.status] = (statusCounts[o.status] || 0) + 1;
-  });
-
-  const breakdown = selectedOrder ? orderBreakdown(selectedOrder) : null;
+  const customDate = date && !DATE_CHIPS.some((chip) => chip.key === date) ? date : '';
+  const hasFilters = !!(date || search.trim());
+  const chip = 'px-3 py-1.5 text-xs font-medium rounded-full transition-colors whitespace-nowrap';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <h1 className="text-2xl font-bold text-gray-800">Заказы</h1>
           <button
             onClick={() => fetchOrders()}
             className="p-2 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-colors"
             title="Обновить"
+            aria-label="Обновить"
           >
             <RefreshCw size={16} />
           </button>
+          <button
+            onClick={exportCsv}
+            disabled={filtered.length === 0}
+            className="p-2 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-colors disabled:opacity-40"
+            title="Скачать таблицу для Excel"
+            aria-label="Скачать таблицу для Excel"
+          >
+            <Download size={16} />
+          </button>
         </div>
-        <div className="relative w-full sm:w-auto">
+        <div className="relative w-full sm:w-80">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Поиск по ID, имени, телефону..."
-            className="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg w-full sm:w-72 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+            placeholder="Номер, имя, телефон, букет, адрес"
+            className="pl-9 pr-9 py-2 text-sm border border-gray-200 rounded-lg w-full"
           />
+          {search && (
+            <button onClick={() => setSearch('')} aria-label="Очистить поиск" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              <X size={14} />
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Status Tabs */}
-      <div className="flex flex-wrap gap-2">
-        {statuses.map((status) => {
-          const count = status === 'all' ? allOrders.length : statusCounts[status] || 0;
-          return (
-            <button
-              key={status}
-              onClick={() => setActiveTab(status)}
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 ${
-                activeTab === status
-                  ? 'bg-primary text-white'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-              }`}
-            >
-              {statusLabels[status]}
-              {count > 0 && (
-                <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                  activeTab === status ? 'bg-white/20' : 'bg-gray-100'
-                }`}>
-                  {count}
-                </span>
-              )}
-            </button>
-          );
-        })}
+      {/* Status views */}
+      <div className="no-scrollbar flex gap-2 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap">
+        {VIEWS.map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setParam({ view: key === 'active' ? null : key, sort: null })}
+            className={`px-3.5 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+              view === key
+                ? 'bg-primary text-white'
+                : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            {label}
+            {counts[key] > 0 && (
+              <span className={`text-xs px-1.5 py-0.5 rounded-full ${view === key ? 'bg-white/20' : 'bg-gray-100'}`}>
+                {counts[key]}
+              </span>
+            )}
+          </button>
+        ))}
       </div>
 
-      {error && (
-        <div className="p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg">{error}</div>
-      )}
+      {/* Delivery date and sort */}
+      <div className="flex flex-wrap items-center gap-2">
+        {DATE_CHIPS.map(({ key, label }) => (
+          <button
+            key={key || 'any'}
+            onClick={() => setParam({ date: key || null })}
+            className={`${chip} ${date === key ? 'bg-ink text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
+          >
+            {label}
+          </button>
+        ))}
+        <input
+          type="date"
+          aria-label="Дата доставки"
+          value={customDate}
+          onChange={(e) => setParam({ date: e.target.value || null })}
+          className="px-2.5 py-1 text-xs border border-gray-200 rounded-full"
+        />
+        <select
+          aria-label="Порядок"
+          value={sort}
+          onChange={(e) => setParam({ sort: e.target.value })}
+          className="px-2.5 py-1.5 text-xs border border-gray-200 rounded-full sm:ml-auto"
+        >
+          <option value="delivery">Сначала ближайшая доставка</option>
+          <option value="newest">Сначала новые заказы</option>
+        </select>
+      </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        {loading ? (
-          <div className="flex items-center justify-center h-40">
-            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center text-gray-400 py-12">Заказов не найдено</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+      {error && <div className="p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg">{error}</div>}
+
+      {loading ? (
+        <div className="flex items-center justify-center h-40">
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 text-center text-gray-500 text-sm py-12 px-4 space-y-2">
+          <p>{hasFilters ? 'С такими условиями заказов нет' : view === 'active' ? 'В работе сейчас ничего нет' : 'Заказов пока нет'}</p>
+          {hasFilters && (
+            <button onClick={() => { setSearch(''); setParam({ date: null }); }} className="font-medium text-primary hover:underline">
+              Сбросить условия
+            </button>
+          )}
+          {!hasFilters && view === 'active' && !!summary?.awaitingPayment && (
+            <Link to="/orders?view=new" className="font-medium text-primary hover:underline">
+              Посмотреть заказы, которые ждут оплаты: {summary.awaitingPayment}
+            </Link>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-5">
+          {/* One table for a wide screen, so the columns line up across the days */}
+          <div className="hidden xl:block bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <table className="w-full table-fixed text-sm">
+              <colgroup>
+                <col className="w-36" />
+                <col className="w-52" />
+                <col />
+                <col className="w-44" />
+                <col className="w-36" />
+                <col className="w-36" />
+              </colgroup>
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">ID</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">Клиент</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">Товары</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">Сумма</th>
-                  <th className="text-center px-4 py-3 font-medium text-gray-500">Тип</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">Статус</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">Оплата</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">Дата</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-500">Действия</th>
+                  <th className="text-left px-3 py-2.5 font-medium text-gray-500">Когда</th>
+                  <th className="text-left px-3 py-2.5 font-medium text-gray-500">Заказ</th>
+                  <th className="text-left px-3 py-2.5 font-medium text-gray-500">Куда</th>
+                  <th className="text-left px-3 py-2.5 font-medium text-gray-500">Клиент</th>
+                  <th className="text-left px-3 py-2.5 font-medium text-gray-500">Сумма и статус</th>
+                  <th className="px-3 py-2.5"><span className="sr-only">Следующий шаг</span></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filtered.map((order) => {
-                  const customerName = [order.user.firstName, order.user.lastName].filter(Boolean).join(' ');
-                  const platform = getPlatform(order.user);
-                  return (
-                    <tr key={order.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => setSelectedOrder(order)}>
-                      <td className="px-4 py-3 font-medium text-gray-800">#{order.id}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-gray-800 font-medium">{customerName}</span>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${platform.soft}`}>
-                            {platform.tag}
-                          </span>
-                        </div>
-                        {order.user.phone && <div className="text-xs text-gray-400">{order.user.phone}</div>}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600">
-                        <div className="max-w-[180px]">
-                          {order.items.slice(0, 2).map((item, i) => (
-                            <div key={i} className="truncate text-xs">{item.name} x{item.quantity}</div>
-                          ))}
-                          {order.items.length > 2 && <div className="text-xs text-gray-400">+{order.items.length - 2} ещё</div>}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 font-medium text-gray-800">{formatRubles(order.totalPrice)}</td>
-                      <td className="px-4 py-3 text-center">
-                        {order.deliveryType === 'pickup' ? (
-                          <Store size={16} className="inline text-gray-500" />
-                        ) : (
-                          <Truck size={16} className="inline text-blue-500" />
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${statusColors[order.status] || 'bg-gray-100 text-gray-600'}`}>
-                          {statusLabels[order.status] || order.status}
+              {groups.map((group) => (
+                <tbody key={group.key} className="divide-y divide-gray-100 border-b border-gray-100 last:border-b-0">
+                  {sort === 'delivery' && (
+                    <tr className="bg-paper/60">
+                      <th colSpan={6} scope="rowgroup" className={`text-left px-3 py-2 text-sm font-semibold ${isIsoDate(group.key) && group.key < studioDate() && WORK_VIEWS.includes(view) ? 'text-red-600' : 'text-gray-700'}`}>
+                        {group.label}
+                        <span className="ml-2 text-xs font-normal text-gray-500">
+                          {group.orders.length} {plural(group.orders.length, 'заказ', 'заказа', 'заказов')}
                         </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${paymentColors[order.paymentStatus] || 'bg-gray-100 text-gray-600'}`}>
-                          {paymentLabels[order.paymentStatus] || order.paymentStatus}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{new Date(order.createdAt).toLocaleDateString('ru-RU')}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                          <button onClick={() => setSelectedOrder(order)} className="p-2 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-colors" title="Подробнее">
-                            <Eye size={16} />
-                          </button>
-                          {nextStatuses[order.status]?.length > 0 && (
-                            <select
-                              disabled={updatingId === order.id}
-                              value=""
-                              onChange={(e) => { if (e.target.value) handleStatusChange(order.id, e.target.value); }}
-                              className="text-xs border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:opacity-50"
-                            >
-                              <option value="">Изменить...</option>
-                              {nextStatuses[order.status].map((s) => (
-                                <option key={s} value={s}>{statusLabels[s]}</option>
-                              ))}
-                            </select>
-                          )}
-                        </div>
-                      </td>
+                      </th>
                     </tr>
-                  );
-                })}
-              </tbody>
+                  )}
+                  {group.orders.map((order) => (
+                    <OrderRow
+                      key={order.id}
+                      order={order}
+                      busy={updatingId === order.id}
+                      showDay={sort !== 'delivery'}
+                      onOpen={() => setParam({ order: String(order.id) }, true)}
+                      onNext={() => advance(order)}
+                    />
+                  ))}
+                </tbody>
+              ))}
             </table>
           </div>
-        )}
-      </div>
 
-      {/* Order Detail Modal */}
-      {selectedOrder && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center p-4 pt-12 overflow-y-auto" onClick={() => setSelectedOrder(null)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-5 border-b border-gray-100">
-              <div className="flex items-center gap-3 flex-wrap">
-                <h2 className="text-lg font-bold text-gray-900">Заказ #{selectedOrder.id}</h2>
-                <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${statusColors[selectedOrder.status]}`}>
-                  {statusLabels[selectedOrder.status]}
-                </span>
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${paymentColors[selectedOrder.paymentStatus]}`}>
-                  {paymentLabels[selectedOrder.paymentStatus] || selectedOrder.paymentStatus}
-                </span>
+          {/* Cards for everything narrower */}
+          {groups.map((group) => (
+            <section key={group.key} className="xl:hidden space-y-2">
+              {sort === 'delivery' && (
+                <h2 className={`text-sm font-semibold flex items-center gap-2 ${isIsoDate(group.key) && group.key < studioDate() && WORK_VIEWS.includes(view) ? 'text-red-600' : 'text-gray-700'}`} style={{ fontFamily: 'inherit', letterSpacing: 0 }}>
+                  {group.label}
+                  <span className="text-xs font-normal text-gray-500">
+                    {group.orders.length} {plural(group.orders.length, 'заказ', 'заказа', 'заказов')}
+                  </span>
+                </h2>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {group.orders.map((order) => (
+                  <OrderCard
+                    key={order.id}
+                    order={order}
+                    busy={updatingId === order.id}
+                    showDay={sort !== 'delivery'}
+                    onOpen={() => setParam({ order: String(order.id) }, true)}
+                    onNext={() => advance(order)}
+                  />
+                ))}
               </div>
-              <button onClick={() => setSelectedOrder(null)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                <X size={18} />
-              </button>
-            </div>
+            </section>
+          ))}
 
-            <div className="p-5 space-y-5 max-h-[70vh] overflow-y-auto">
-              {/* Refund reminder */}
-              {selectedOrder.status === 'canceled' && selectedOrder.paymentStatus === 'paid' && (
-                <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg flex items-start gap-2">
-                  <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-                  <span>Заказ оплачен и отменён. Деньги сами не вернутся: сделайте возврат {formatRubles(selectedOrder.totalPrice)} в кабинете ЮKassa, если ещё не сделали.</span>
-                </div>
-              )}
-
-              {/* Status Actions */}
-              {nextStatuses[selectedOrder.status]?.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {nextStatuses[selectedOrder.status].map((s) => (
-                    <button
-                      key={s}
-                      disabled={updatingId === selectedOrder.id}
-                      onClick={() => handleStatusChange(selectedOrder.id, s)}
-                      className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 ${
-                        s === 'canceled' ? 'border border-red-200 text-red-600 hover:bg-red-50' : 'bg-primary text-white hover:bg-primary/90'
-                      }`}
-                    >
-                      {statusLabels[s]}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Customer */}
-              <div className="bg-gray-50 rounded-xl p-4">
-                <h3 className="text-sm font-semibold text-gray-500 uppercase mb-3 flex items-center gap-2"><User size={14} /> Клиент</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                  <div><span className="text-gray-400">Имя:</span> <span className="font-medium">{[selectedOrder.user.firstName, selectedOrder.user.lastName].filter(Boolean).join(' ')}</span></div>
-                  {selectedOrder.user.username && <div><span className="text-gray-400">Username:</span> <span className="font-medium">@{selectedOrder.user.username}</span></div>}
-                  {selectedOrder.user.phone && <div><span className="text-gray-400">Телефон:</span> <span className="font-medium">{selectedOrder.user.phone}</span></div>}
-                  <div>
-                    <span className="text-gray-400">Платформа:</span>{' '}
-                    <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${getPlatform(selectedOrder.user).strong}`}>
-                      {getPlatform(selectedOrder.user).full}
-                    </span>
-                    <span className="ml-2 font-mono text-xs text-gray-400">{selectedOrder.user.telegramId || selectedOrder.user.maxId}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Items */}
-              <div className="bg-gray-50 rounded-xl p-4">
-                <h3 className="text-sm font-semibold text-gray-500 uppercase mb-3">Состав заказа</h3>
-                <div className="space-y-2">
-                  {selectedOrder.items.map((item) => {
-                    const imgSrc = item.bouquet?.images?.[0]?.url;
-                    return (
-                      <div key={item.id} className="flex items-center gap-3 bg-white rounded-lg p-2">
-                        <div className="w-10 h-10 rounded-lg bg-gray-100 shrink-0 overflow-hidden">
-                          {imgSrc ? <img src={imageUrl(imgSrc)} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-300 text-xs">🌹</div>}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-800 truncate">{item.name}</p>
-                          <p className="text-xs text-gray-400">{item.quantity} x {formatRubles(item.price)}</p>
-                        </div>
-                        <span className="text-sm font-semibold text-gray-800">{formatRubles(item.price * item.quantity)}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Delivery */}
-              <div className="bg-gray-50 rounded-xl p-4">
-                <h3 className="text-sm font-semibold text-gray-500 uppercase mb-3 flex items-center gap-2">
-                  {selectedOrder.deliveryType === 'pickup' ? <Store size={14} /> : <Truck size={14} />}
-                  {selectedOrder.deliveryType === 'pickup' ? 'Самовывоз' : 'Доставка'}
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                  {selectedOrder.address && (
-                    <div className="sm:col-span-2 flex items-start gap-2">
-                      <MapPin size={14} className="text-gray-400 mt-0.5 shrink-0" />
-                      <div>
-                        <div>{formatAddress(selectedOrder.address)}</div>
-                        {selectedOrder.address.comment && <div className="text-gray-500 mt-0.5">{selectedOrder.address.comment}</div>}
-                      </div>
-                    </div>
-                  )}
-                  {selectedOrder.deliveryDate && (
-                    <div className="flex items-center gap-2">
-                      <Clock size={14} className="text-gray-400" />
-                      <span>{new Date(selectedOrder.deliveryDate).toLocaleDateString('ru-RU')}</span>
-                      {selectedOrder.deliveryTime && <span className="text-gray-400">({selectedOrder.deliveryTime})</span>}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Recipient */}
-              {(selectedOrder.recipientName || selectedOrder.recipientPhone) && (
-                <div className="bg-gray-50 rounded-xl p-4">
-                  <h3 className="text-sm font-semibold text-gray-500 uppercase mb-3 flex items-center gap-2">
-                    <Gift size={14} /> Получатель
-                    {selectedOrder.isAnonymous && <span className="text-xs font-normal text-orange-500 ml-1">(анонимно)</span>}
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                    {selectedOrder.recipientName && <div><span className="text-gray-400">Имя:</span> <span className="font-medium">{selectedOrder.recipientName}</span></div>}
-                    {selectedOrder.recipientPhone && <div><span className="text-gray-400">Телефон:</span> <span className="font-medium">{selectedOrder.recipientPhone}</span></div>}
-                  </div>
-                </div>
-              )}
-
-              {/* Card Text */}
-              {selectedOrder.cardText && (
-                <div className="bg-gray-50 rounded-xl p-4">
-                  <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2 flex items-center gap-2"><MessageSquare size={14} /> Текст открытки</h3>
-                  <p className="text-sm text-gray-700 italic">&laquo;{selectedOrder.cardText}&raquo;</p>
-                </div>
-              )}
-
-              {/* Comment */}
-              {selectedOrder.comment && (
-                <div className="bg-gray-50 rounded-xl p-4">
-                  <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">Комментарий</h3>
-                  <p className="text-sm text-gray-700">{selectedOrder.comment}</p>
-                </div>
-              )}
-
-              {/* Financial */}
-              {breakdown && (
-                <div className="bg-gray-50 rounded-xl p-4">
-                  <h3 className="text-sm font-semibold text-gray-500 uppercase mb-3 flex items-center gap-2"><CreditCard size={14} /> Стоимость</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between"><span className="text-gray-500">Товары</span><span className="font-medium">{formatRubles(breakdown.itemsTotal)}</span></div>
-                    {breakdown.promoDiscount > 0 && <div className="flex justify-between text-green-600"><span>Промокод {selectedOrder.promoCode}</span><span>-{formatRubles(breakdown.promoDiscount)}</span></div>}
-                    {selectedOrder.bonusUsed > 0 && <div className="flex justify-between text-green-600"><span>Использовано бонусов</span><span>-{formatRubles(selectedOrder.bonusUsed)}</span></div>}
-                    {selectedOrder.deliveryType === 'delivery' && breakdown.deliveryPrice >= 0 && (
-                      <div className="flex justify-between"><span className="text-gray-500">Доставка</span><span className="font-medium">{breakdown.deliveryPrice > 0 ? formatRubles(breakdown.deliveryPrice) : 'бесплатно'}</span></div>
-                    )}
-                    <div className="flex justify-between pt-2 border-t border-gray-200 font-semibold text-gray-800"><span>Итого</span><span>{formatRubles(selectedOrder.totalPrice)}</span></div>
-                    {selectedOrder.bonusEarned > 0 && selectedOrder.status !== 'canceled' && (
-                      <div className="flex justify-between text-primary"><span className="flex items-center gap-1"><Star size={12} /> {selectedOrder.paymentStatus === 'paid' ? 'Начислено бонусов' : 'Начислится после оплаты'}</span><span>+{selectedOrder.bonusEarned}</span></div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <p className="text-xs text-gray-400 text-right">Создан {new Date(selectedOrder.createdAt).toLocaleString('ru-RU')}</p>
-            </div>
-          </div>
+          {filtered.length > visible && (
+            <button
+              onClick={() => setVisible((current) => current + PAGE_SIZE)}
+              className="w-full py-3 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+            >
+              Показать ещё, осталось {filtered.length - visible}
+            </button>
+          )}
         </div>
+      )}
+
+      {openId && (
+        <OrderDrawer
+          orderId={openId}
+          preview={orders.find((order) => order.id === openId)}
+          onClose={() => setParam({ order: null })}
+          onChanged={() => fetchOrders(true)}
+        />
       )}
     </div>
   );

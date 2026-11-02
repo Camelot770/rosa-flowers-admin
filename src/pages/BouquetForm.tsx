@@ -1,8 +1,10 @@
-import { useState, useEffect, useMemo, FormEvent, ChangeEvent } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Upload, X, Loader2, AlertTriangle } from 'lucide-react';
+import { useState, useEffect, useRef, FormEvent, ChangeEvent, DragEvent } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, ChevronLeft, ChevronRight, Upload, X, Loader2, AlertTriangle } from 'lucide-react';
 import api from '../api/client';
 import { imageUrl } from '../utils/image';
+import { resizeImage } from '../utils/resizeImage';
+import { useToast } from '../components/Toast';
 
 interface BouquetData {
   id?: string;
@@ -33,6 +35,17 @@ const CATEGORIES = [
   { value: 'greenery', label: 'Зелень' },
 ];
 
+// A saved photo has an id, a new one has the file to upload. The first photo is the main one everywhere.
+interface Photo {
+  key: string;
+  url: string;
+  id?: number;
+  file?: File;
+}
+
+// The server takes this many files in one request
+const MAX_NEW_PHOTOS = 10;
+
 const initialData: BouquetData = {
   name: '',
   description: '',
@@ -51,13 +64,19 @@ const initialData: BouquetData = {
 export default function BouquetForm() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const toast = useToast();
   const isEdit = Boolean(id);
+  const backTo = `/bouquets${(location.state as { back?: string } | null)?.back || ''}`;
 
   const [form, setForm] = useState<BouquetData>(initialData);
   const [loadedFeatured, setLoadedFeatured] = useState(false);
-  const [images, setImages] = useState<File[]>([]);
-  const [existingImages, setExistingImages] = useState<{ id: number; url: string }[]>([]);
+  const [photos, setPhotos] = useState<Photo[]>([]);
   const [originalImageIds, setOriginalImageIds] = useState<number[]>([]);
+  const [preparingPhotos, setPreparingPhotos] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const addAnother = useRef(false);
+  const objectUrls = useRef(new Set<string>());
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState('');
@@ -90,12 +109,13 @@ export default function BouquetForm() {
         setLoadedFeatured(bouquet.isFeatured || false);
         if (bouquet.images) {
           const imgs = Array.isArray(bouquet.images) ? bouquet.images : [bouquet.images];
-          const mapped = imgs.map((img: any) => ({
+          const mapped: Photo[] = imgs.map((img: any) => ({
+            key: `saved-${img.id}`,
             id: img.id,
-            url: typeof img === 'string' ? img : img.url,
+            url: imageUrl(typeof img === 'string' ? img : img.url),
           }));
-          setExistingImages(mapped);
-          setOriginalImageIds(mapped.map((m: { id: number }) => m.id));
+          setPhotos(mapped);
+          setOriginalImageIds(mapped.map((m) => m.id as number));
         }
       })
       .catch(() => setError('Ошибка загрузки букета'))
@@ -113,27 +133,58 @@ export default function BouquetForm() {
     }
   };
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setImages((prev) => [...prev, ...Array.from(e.target.files!)]);
+  const addFiles = async (files: File[]) => {
+    const pictures = files.filter((file) => file.type.startsWith('image/'));
+    if (pictures.length === 0) return;
+    const room = MAX_NEW_PHOTOS - photos.filter((photo) => photo.file).length;
+    if (pictures.length > room) {
+      toast(`За один раз можно добавить до ${MAX_NEW_PHOTOS} фото`, { tone: 'error' });
     }
+    const accepted = pictures.slice(0, Math.max(0, room));
+    if (accepted.length === 0) return;
+    setPreparingPhotos(true);
+    const resized = await Promise.all(accepted.map(resizeImage));
+    setPreparingPhotos(false);
+    const added = resized.map((file, index) => {
+      const url = URL.createObjectURL(file);
+      objectUrls.current.add(url);
+      return { key: `new-${Date.now()}-${index}`, url, file };
+    });
+    setPhotos((prev) => [...prev, ...added]);
   };
 
-  const removeNewImage = (index: number) => {
-    setImages((prev) => prev.filter((_, i) => i !== index));
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) addFiles(Array.from(e.target.files));
+    // The same file can be chosen again after it was removed
+    e.target.value = '';
   };
 
-  const removeExistingImage = (index: number) => {
-    setExistingImages((prev) => prev.filter((_, i) => i !== index));
+  const handleDrop = (e: DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    addFiles(Array.from(e.dataTransfer.files));
   };
 
-  // Create and cleanup object URLs for new image previews
-  const imagePreviewUrls = useMemo(() => images.map((f) => URL.createObjectURL(f)), [images]);
+  const removePhoto = (key: string) => {
+    setPhotos((prev) => prev.filter((photo) => photo.key !== key));
+  };
+
+  const movePhoto = (index: number, direction: -1 | 1) => {
+    setPhotos((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(index, 1);
+      next.splice(index + direction, 0, moved);
+      return next;
+    });
+  };
+
+  // Previews of new photos live as long as the form
   useEffect(() => {
+    const urls = objectUrls.current;
     return () => {
-      imagePreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+      urls.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [imagePreviewUrls]);
+  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -163,23 +214,35 @@ export default function BouquetForm() {
       fd.append('sortOrder', form.sortOrder);
 
       // Вычисляем удалённые изображения (были в оригинале, но убраны пользователем)
-      const currentIds = existingImages.map((img) => img.id);
+      const currentIds = photos.filter((photo) => photo.id).map((photo) => photo.id as number);
       const deletedIds = originalImageIds.filter((origId) => !currentIds.includes(origId));
       if (deletedIds.length > 0) {
         fd.append('deleteImages', JSON.stringify(deletedIds));
       }
 
-      images.forEach((file) => {
-        fd.append('images', file);
+      // Files go in the order they stand in the list, so a new bouquet needs nothing more
+      let newIndex = 0;
+      const imageOrder = photos.map((photo) => {
+        if (photo.id) return photo.id;
+        fd.append('images', photo.file as File);
+        return `new:${newIndex++}`;
       });
 
       if (isEdit) {
+        fd.append('imageOrder', JSON.stringify(imageOrder));
         await api.put(`/bouquets/${id}`, fd);
       } else {
         await api.post('/bouquets', fd);
       }
 
-      navigate('/bouquets');
+      if (addAnother.current) {
+        toast(`Букет «${form.name}» создан, можно добавлять следующий`);
+        setForm(initialData);
+        setPhotos([]);
+        window.scrollTo({ top: 0 });
+      } else {
+        navigate(backTo);
+      }
     } catch (err: any) {
       setError(err.response?.data?.error || err.response?.data?.message || 'Ошибка сохранения букета');
     } finally {
@@ -221,7 +284,8 @@ export default function BouquetForm() {
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <button
-          onClick={() => navigate('/bouquets')}
+          onClick={() => navigate(backTo)}
+          aria-label="Назад к букетам"
           className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
         >
           <ArrowLeft size={20} />
@@ -296,6 +360,12 @@ export default function BouquetForm() {
           </div>
         </div>
 
+        {Number(form.oldPrice) > 0 && Number(form.oldPrice) <= Number(form.price) && (
+          <p className="-mt-3 text-xs text-amber-700">
+            Старая цена не выше новой, поэтому скидку на витрине не покажем.
+          </p>
+        )}
+
         {/* Category */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Категория</label>
@@ -339,6 +409,7 @@ export default function BouquetForm() {
             min="0"
             className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
           />
+          <p className="mt-1 text-xs text-gray-500">Чем меньше число, тем выше букет в мини-приложениях. Удобнее двигать стрелками в списке букетов.</p>
         </div>
 
         {/* Toggles */}
@@ -411,57 +482,71 @@ export default function BouquetForm() {
 
         {/* Images */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">Изображения</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Фотографии</label>
+          {photos.length > 1 && (
+            <p className="mb-2 text-xs text-gray-500">Первое фото главное: его видно в каталоге и на обложке. Порядок меняется стрелками.</p>
+          )}
 
-          {/* Existing images */}
-          {existingImages.length > 0 && (
+          {photos.length > 0 && (
             <div className="flex flex-wrap gap-3 mb-3">
-              {existingImages.map((img, i) => (
-                <div key={img.id} className="relative w-24 h-24 rounded-lg overflow-hidden border border-gray-200">
-                  <img
-                    src={imageUrl(img.url)}
-                    alt=""
-                    className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
-                    onClick={() => setPreviewUrl(imageUrl(img.url))}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeExistingImage(i)}
-                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 transition-colors"
-                  >
-                    <X size={14} />
-                  </button>
+              {photos.map((photo, i) => (
+                <div key={photo.key} className="w-28">
+                  <div className="relative w-28 h-28 rounded-lg overflow-hidden border border-gray-200">
+                    <img
+                      src={photo.url}
+                      alt=""
+                      className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => setPreviewUrl(photo.url)}
+                    />
+                    {i === 0 && (
+                      <span className="absolute left-1 top-1 px-1.5 py-0.5 text-[10px] font-medium bg-primary text-white rounded">Главное</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removePhoto(photo.key)}
+                      aria-label={`Убрать фото ${i + 1}`}
+                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 transition-colors"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                  {photos.length > 1 && (
+                    <div className="flex justify-between mt-1">
+                      <button
+                        type="button"
+                        onClick={() => movePhoto(i, -1)}
+                        disabled={i === 0}
+                        aria-label={`Фото ${i + 1} левее`}
+                        className="p-1.5 text-gray-500 hover:text-primary rounded disabled:opacity-25"
+                      >
+                        <ChevronLeft size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => movePhoto(i, 1)}
+                        disabled={i === photos.length - 1}
+                        aria-label={`Фото ${i + 1} правее`}
+                        className="p-1.5 text-gray-500 hover:text-primary rounded disabled:opacity-25"
+                      >
+                        <ChevronRight size={16} />
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           )}
 
-          {/* New images preview */}
-          {images.length > 0 && (
-            <div className="flex flex-wrap gap-3 mb-3">
-              {images.map((file, i) => (
-                <div key={i} className="relative w-24 h-24 rounded-lg overflow-hidden border border-gray-200">
-                  <img
-                    src={imagePreviewUrls[i]}
-                    alt=""
-                    className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
-                    onClick={() => setPreviewUrl(imagePreviewUrls[i])}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeNewImage(i)}
-                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 transition-colors"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors">
-            <Upload size={18} className="text-gray-400" />
-            <span className="text-sm text-gray-500">Загрузить изображения</span>
+          <label
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleDrop}
+            className={`flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed rounded-lg cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors ${
+              dragOver ? 'border-primary bg-primary/5' : 'border-gray-300'
+            }`}
+          >
+            {preparingPhotos ? <Loader2 size={18} className="animate-spin text-gray-400" /> : <Upload size={18} className="text-gray-400" />}
+            <span className="text-sm text-gray-500">{preparingPhotos ? 'Готовим фото...' : 'Выберите фото или перетащите сюда'}</span>
             <input
               type="file"
               accept="image/*"
@@ -473,18 +558,29 @@ export default function BouquetForm() {
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-3 pt-4 border-t border-gray-100">
+        <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-gray-100">
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || preparingPhotos}
+            onClick={() => { addAnother.current = false; }}
             className="px-6 py-2.5 bg-primary text-white font-medium rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {loading && <Loader2 size={16} className="animate-spin" />}
             {isEdit ? 'Сохранить' : 'Создать'}
           </button>
+          {!isEdit && (
+            <button
+              type="submit"
+              disabled={loading || preparingPhotos}
+              onClick={() => { addAnother.current = true; }}
+              className="px-6 py-2.5 border border-primary text-primary font-medium rounded-lg hover:bg-primary/5 transition-colors disabled:opacity-50"
+            >
+              Создать и добавить ещё
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => navigate('/bouquets')}
+            onClick={() => navigate(backTo)}
             className="px-6 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
           >
             Отмена

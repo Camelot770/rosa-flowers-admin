@@ -2,12 +2,15 @@ import { useState, useEffect, FormEvent } from 'react';
 import { Loader2, Save, CheckCircle, Building2, Truck, Star, Share2, KeyRound } from 'lucide-react';
 import api from '../api/client';
 import ChangePasswordForm from '../components/ChangePasswordForm';
+import { useToast } from '../components/Toast';
 
 interface SettingField {
   key: string;
   label: string;
   type?: 'text' | 'email' | 'tel' | 'number' | 'textarea';
   placeholder?: string;
+  hint?: string;
+  max?: number;
 }
 
 interface SettingSection {
@@ -26,7 +29,7 @@ const SECTIONS: SettingSection[] = [
     bg: 'bg-blue-50',
     fields: [
       { key: 'studio_name', label: 'Название студии', placeholder: 'Роза цветов' },
-      { key: 'phone', label: 'Телефон', type: 'tel', placeholder: '+7 (917) 876-59-58' },
+      { key: 'phone', label: 'Телефон', type: 'tel', placeholder: '+7 (917) 876-59-58', hint: 'Клиенты видят его в приложении и звонят на него' },
       { key: 'email', label: 'Email', type: 'email', placeholder: 'rozacvetov@list.ru' },
       { key: 'address', label: 'Адрес', placeholder: 'д. Званка, ул. Приозёрная, д. 58' },
       { key: 'work_hours', label: 'Часы работы', placeholder: '09:00 – 21:00' },
@@ -38,9 +41,9 @@ const SECTIONS: SettingSection[] = [
     color: 'text-orange-600',
     bg: 'bg-orange-50',
     fields: [
-      { key: 'delivery_price', label: 'Стоимость доставки (₽)', type: 'number', placeholder: '300' },
-      { key: 'free_delivery_from', label: 'Бесплатная доставка от (₽)', type: 'number', placeholder: '3000' },
-      { key: 'min_order', label: 'Минимальный заказ (₽)', type: 'number', placeholder: '1000' },
+      { key: 'delivery_price', label: 'Стоимость доставки (₽)', type: 'number', placeholder: '300', hint: 'Прибавляется к заказу, если он меньше суммы бесплатной доставки' },
+      { key: 'free_delivery_from', label: 'Бесплатная доставка от (₽)', type: 'number', placeholder: '3000', hint: 'Заказ от этой суммы доставляется бесплатно' },
+      { key: 'min_order', label: 'Минимальный заказ (₽)', type: 'number', placeholder: '1000', hint: 'Заказ меньше этой суммы оформить нельзя' },
     ],
   },
   {
@@ -49,8 +52,8 @@ const SECTIONS: SettingSection[] = [
     color: 'text-primary',
     bg: 'bg-paper-2',
     fields: [
-      { key: 'bonus_percent', label: 'Процент кэшбэка (%)', type: 'number', placeholder: '5' },
-      { key: 'max_bonus_discount', label: 'Макс. скидка бонусами (%)', type: 'number', placeholder: '20' },
+      { key: 'bonus_percent', label: 'Процент кэшбэка (%)', type: 'number', placeholder: '5', max: 100, hint: 'Сколько бонусов клиент получает с оплаченного заказа' },
+      { key: 'max_bonus_discount', label: 'Макс. скидка бонусами (%)', type: 'number', placeholder: '20', max: 100, hint: 'Какую часть заказа можно оплатить бонусами' },
     ],
   },
   {
@@ -67,11 +70,12 @@ const SECTIONS: SettingSection[] = [
 ];
 
 export default function Settings() {
+  const toast = useToast();
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
   const [passwordChanged, setPasswordChanged] = useState(false);
 
   useEffect(() => {
@@ -88,19 +92,18 @@ export default function Settings() {
 
   const handleChange = (key: string, value: string) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
-    if (success) setSuccess(false);
+    setDirty(true);
   };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setError('');
-    setSuccess(false);
 
     try {
       await api.put('/settings', settings);
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
+      setDirty(false);
+      toast('Настройки сохранены');
     } catch (err: any) {
       setError(err.response?.data?.error || err.response?.data?.message || 'Ошибка сохранения настроек');
     } finally {
@@ -123,13 +126,6 @@ export default function Settings() {
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg">
           {error}
-        </div>
-      )}
-
-      {success && (
-        <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg flex items-center gap-2">
-          <CheckCircle size={16} />
-          Настройки успешно сохранены
         </div>
       )}
 
@@ -167,9 +163,13 @@ export default function Settings() {
                         value={settings[field.key] || ''}
                         onChange={(e) => handleChange(field.key, e.target.value)}
                         placeholder={field.placeholder}
+                        min={field.type === 'number' ? 0 : undefined}
+                        max={field.max}
+                        step={field.type === 'number' ? 1 : undefined}
                         className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
                       />
                     )}
+                    {field.hint && <p className="mt-1 text-xs text-gray-500">{field.hint}</p>}
                   </div>
                 ))}
               </div>
@@ -178,7 +178,8 @@ export default function Settings() {
         })}
 
         {/* Save Button */}
-        <div className="flex justify-end">
+        <div className="sticky bottom-14 md:bottom-0 z-10 -mx-4 md:mx-0 px-4 md:px-0 py-3 bg-paper/95 flex items-center justify-end gap-3">
+          {dirty && <span className="text-xs text-gray-500">Есть несохранённые изменения</span>}
           <button
             type="submit"
             disabled={saving}

@@ -1,6 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useState, useEffect, useCallback } from 'react';
-import { Menu } from 'lucide-react';
 import api from './api/client';
 import Login from './pages/Login';
 import ChangePassword from './pages/ChangePassword';
@@ -14,6 +13,8 @@ import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
 import Broadcast from './pages/Broadcast';
 import Sidebar from './components/layout/Sidebar';
+import { ToastProvider } from './components/Toast';
+import { OrderSummaryProvider } from './components/OrderSummary';
 
 function ServerDown({ onRetry }: { onRetry: () => void }) {
   return (
@@ -109,21 +110,12 @@ function App() {
   }
 
   return (
+    <ToastProvider>
+      <OrderSummaryProvider>
     <div className="flex min-h-screen">
-      <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} onLogout={handleLogout} />
-      <div className="flex-1 min-w-0 md:ml-64">
-        {/* On phones the sidebar is hidden and opens from here */}
-        <header className="md:hidden sticky top-0 z-30 flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200">
-          <button
-            onClick={() => setMenuOpen(true)}
-            aria-label="Открыть меню"
-            className="p-2 -ml-2 rounded-lg hover:bg-gray-100 transition-colors"
-          >
-            <Menu size={20} />
-          </button>
-          <span className="text-base font-bold text-primary">🌹 Роза цветов</span>
-        </header>
-        <main className="p-4 md:p-6">
+      <Sidebar open={menuOpen} onOpen={() => setMenuOpen(true)} onClose={() => setMenuOpen(false)} onLogout={handleLogout} />
+      <div className="flex-1 min-w-0 md:ml-64 print:ml-0">
+        <main className="p-4 pb-24 md:p-6">
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/bouquets" element={<Bouquets />} />
@@ -140,6 +132,8 @@ function App() {
         </main>
       </div>
     </div>
+      </OrderSummaryProvider>
+    </ToastProvider>
   );
 }
 

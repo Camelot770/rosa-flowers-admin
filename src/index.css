@@ -51,6 +51,18 @@ input:focus, select:focus, textarea:focus {
    because of the tailwind color alias. Add a subtle hover tint. */
 button { -webkit-tap-highlight-color: transparent; }
 
+/* A printed order is only its slip */
+.print-slip { display: none; }
+@media print {
+  #root { display: none; }
+  .print-slip { display: block; }
+  body { background: #fff; }
+}
+
+/* Rows of filters scroll sideways on a phone without a bar under them */
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
 /* Scrollbar polish */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: var(--paper-2); }
