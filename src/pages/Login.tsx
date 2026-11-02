@@ -2,7 +2,15 @@ import { useState, FormEvent } from 'react';
 import api from '../api/client';
 
 interface Props {
-  onLogin: () => void;
+  onLogin: (mustChangePassword: boolean) => void;
+}
+
+function loginErrorMessage(err: any): string {
+  const status = err.response?.status;
+  if (status === 401) return 'Неверный логин или пароль';
+  if (status === 429) return err.response.data?.error || 'Слишком много попыток входа. Подождите и попробуйте снова.';
+  if (!err.response || status >= 500) return 'Сервер недоступен. Дело не в пароле, попробуйте войти позже.';
+  return err.response.data?.error || err.response.data?.message || 'Не удалось войти. Попробуйте ещё раз.';
 }
 
 export default function Login({ onLogin }: Props) {
@@ -19,9 +27,9 @@ export default function Login({ onLogin }: Props) {
     try {
       const { data } = await api.post('/auth/login', { login, password });
       localStorage.setItem('rosa_admin_token', data.token);
-      onLogin();
+      onLogin(data.mustChangePassword === true);
     } catch (err: any) {
-      setError(err.response?.data?.error || err.response?.data?.message || 'Ошибка входа. Проверьте логин и пароль.');
+      setError(loginErrorMessage(err));
     } finally {
       setLoading(false);
     }

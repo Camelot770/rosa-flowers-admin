@@ -1,6 +1,7 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { Loader2, Save, CheckCircle, Building2, Truck, Star, Share2 } from 'lucide-react';
+import { Loader2, Save, CheckCircle, Building2, Truck, Star, Share2, KeyRound } from 'lucide-react';
 import api from '../api/client';
+import ChangePasswordForm from '../components/ChangePasswordForm';
 
 interface SettingField {
   key: string;
@@ -71,6 +72,7 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [passwordChanged, setPasswordChanged] = useState(false);
 
   useEffect(() => {
     api
@@ -191,6 +193,26 @@ export default function Settings() {
           </button>
         </div>
       </form>
+
+      {/* Password */}
+      <div className="mt-6 bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
+          <div className="w-8 h-8 rounded-lg bg-paper-2 flex items-center justify-center">
+            <KeyRound size={16} className="text-primary" />
+          </div>
+          <h2 className="text-base font-semibold text-gray-800">Смена пароля</h2>
+        </div>
+
+        <div className="p-6">
+          {passwordChanged && (
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg flex items-center gap-2">
+              <CheckCircle size={16} />
+              Пароль изменён
+            </div>
+          )}
+          <ChangePasswordForm onChanged={() => setPasswordChanged(true)} />
+        </div>
+      </div>
     </div>
   );
 }

@@ -14,10 +14,13 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// On these routes a 401 means a wrong password, not an expired session
+const PASSWORD_CHECK_URLS = ['/auth/login', '/auth/password'];
+
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && !PASSWORD_CHECK_URLS.includes(error.config?.url)) {
       localStorage.removeItem('rosa_admin_token');
       window.location.href = '/login';
     }
