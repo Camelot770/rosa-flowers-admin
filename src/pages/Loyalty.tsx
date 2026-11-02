@@ -142,7 +142,7 @@ export default function Loyalty() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-6">
         <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
           <Star size={22} className="text-primary" />
           Программа лояльности
@@ -180,54 +180,56 @@ export default function Loyalty() {
             {search ? 'Ничего не найдено' : 'Нет клиентов'}
           </div>
         ) : (
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gray-50/50">
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Имя</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Платформа</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Username</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Телефон</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Бонусные баллы</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Действия</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((user) => (
-                <tr
-                  key={user.id}
-                  className="border-b border-gray-50 hover:bg-gray-50/50 cursor-pointer transition-colors"
-                  onClick={() => openUserHistory(user)}
-                >
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                    {[user.firstName, user.lastName].filter(Boolean).join(' ') || '---'}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${getPlatform(user).strong}`}>
-                      {getPlatform(user).short}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
-                    {user.username ? `@${user.username}` : '---'}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{user.phone || '---'}</td>
-                  <td className="px-4 py-3 text-sm text-right">
-                    <span className={`font-semibold ${user.bonusPoints > 0 ? 'text-primary' : 'text-gray-400'}`}>
-                      {user.bonusPoints}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); openUserHistory(user); }}
-                      className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-colors"
-                      title="История"
-                    >
-                      <History size={16} />
-                    </button>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50/50">
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Имя</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Платформа</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Username</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Телефон</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Бонусные баллы</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Действия</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filtered.map((user) => (
+                  <tr
+                    key={user.id}
+                    className="border-b border-gray-50 hover:bg-gray-50/50 cursor-pointer transition-colors"
+                    onClick={() => openUserHistory(user)}
+                  >
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                      {[user.firstName, user.lastName].filter(Boolean).join(' ') || '---'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${getPlatform(user).strong}`}>
+                        {getPlatform(user).short}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {user.username ? `@${user.username}` : '---'}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{user.phone || '---'}</td>
+                    <td className="px-4 py-3 text-sm text-right">
+                      <span className={`font-semibold ${user.bonusPoints > 0 ? 'text-primary' : 'text-gray-400'}`}>
+                        {user.bonusPoints}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); openUserHistory(user); }}
+                        className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-colors"
+                        title="История"
+                      >
+                        <History size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

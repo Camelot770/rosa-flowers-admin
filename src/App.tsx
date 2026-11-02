@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useState, useEffect, useCallback } from 'react';
+import { Menu } from 'lucide-react';
 import api from './api/client';
 import Login from './pages/Login';
 import ChangePassword from './pages/ChangePassword';
@@ -37,6 +38,7 @@ function App() {
   const [isAuth, setIsAuth] = useState<boolean | null>(null);
   const [serverDown, setServerDown] = useState(false);
   const [mustChangePassword, setMustChangePassword] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const checkAuth = useCallback(() => {
     const token = localStorage.getItem('rosa_admin_token');
@@ -108,22 +110,35 @@ function App() {
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar onLogout={handleLogout} />
-      <main className="flex-1 p-6 ml-64">
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/bouquets" element={<Bouquets />} />
-          <Route path="/bouquets/new" element={<BouquetForm />} />
-          <Route path="/bouquets/:id" element={<BouquetForm />} />
-          <Route path="/users" element={<Users />} />
-          <Route path="/orders" element={<Orders />} />
-          <Route path="/loyalty" element={<Loyalty />} />
-          <Route path="/analytics" element={<Analytics />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/broadcast" element={<Broadcast />} />
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
-      </main>
+      <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} onLogout={handleLogout} />
+      <div className="flex-1 min-w-0 md:ml-64">
+        {/* On phones the sidebar is hidden and opens from here */}
+        <header className="md:hidden sticky top-0 z-30 flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200">
+          <button
+            onClick={() => setMenuOpen(true)}
+            aria-label="Открыть меню"
+            className="p-2 -ml-2 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            <Menu size={20} />
+          </button>
+          <span className="text-base font-bold text-primary">🌹 Роза цветов</span>
+        </header>
+        <main className="p-4 md:p-6">
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/bouquets" element={<Bouquets />} />
+            <Route path="/bouquets/new" element={<BouquetForm />} />
+            <Route path="/bouquets/:id" element={<BouquetForm />} />
+            <Route path="/users" element={<Users />} />
+            <Route path="/orders" element={<Orders />} />
+            <Route path="/loyalty" element={<Loyalty />} />
+            <Route path="/analytics" element={<Analytics />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/broadcast" element={<Broadcast />} />
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
+        </main>
+      </div>
     </div>
   );
 }

@@ -214,7 +214,7 @@ export default function Users() {
                     <h2 className="text-lg font-bold text-gray-900">
                       {[selectedUser.firstName, selectedUser.lastName].filter(Boolean).join(' ') || 'Клиент'}
                     </h2>
-                    <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-sm text-gray-500">
                       {selectedUser.username && <span>@{selectedUser.username}</span>}
                       {selectedUser.phone && <span>{selectedUser.phone}</span>}
                       <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${getPlatform(selectedUser).strong}`}>
@@ -245,7 +245,7 @@ export default function Users() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 p-2.5 bg-green-50 rounded-lg">
-                    <Calendar size={16} className="text-green-600" />
+                    <Calendar size={16} className="text-green-600 shrink-0" />
                     <div>
                       <p className="text-xs text-gray-500">С нами с</p>
                       <p className="font-bold text-gray-800 text-xs">{new Date(selectedUser.createdAt).toLocaleDateString('ru-RU')}</p>

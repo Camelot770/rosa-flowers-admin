@@ -204,7 +204,7 @@ export default function Orders() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold text-gray-800">Заказы</h1>
           <button
@@ -215,14 +215,14 @@ export default function Orders() {
             <RefreshCw size={16} />
           </button>
         </div>
-        <div className="relative">
+        <div className="relative w-full sm:w-auto">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Поиск по ID, имени, телефону..."
-            className="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg w-72 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+            className="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg w-full sm:w-72 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
           />
         </div>
       </div>
@@ -384,7 +384,7 @@ export default function Orders() {
 
               {/* Status Actions */}
               {nextStatuses[selectedOrder.status]?.length > 0 && (
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   {nextStatuses[selectedOrder.status].map((s) => (
                     <button
                       key={s}
@@ -403,7 +403,7 @@ export default function Orders() {
               {/* Customer */}
               <div className="bg-gray-50 rounded-xl p-4">
                 <h3 className="text-sm font-semibold text-gray-500 uppercase mb-3 flex items-center gap-2"><User size={14} /> Клиент</h3>
-                <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                   <div><span className="text-gray-400">Имя:</span> <span className="font-medium">{[selectedOrder.user.firstName, selectedOrder.user.lastName].filter(Boolean).join(' ')}</span></div>
                   {selectedOrder.user.username && <div><span className="text-gray-400">Username:</span> <span className="font-medium">@{selectedOrder.user.username}</span></div>}
                   {selectedOrder.user.phone && <div><span className="text-gray-400">Телефон:</span> <span className="font-medium">{selectedOrder.user.phone}</span></div>}
@@ -445,9 +445,9 @@ export default function Orders() {
                   {selectedOrder.deliveryType === 'pickup' ? <Store size={14} /> : <Truck size={14} />}
                   {selectedOrder.deliveryType === 'pickup' ? 'Самовывоз' : 'Доставка'}
                 </h3>
-                <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                   {selectedOrder.address && (
-                    <div className="col-span-2 flex items-start gap-2">
+                    <div className="sm:col-span-2 flex items-start gap-2">
                       <MapPin size={14} className="text-gray-400 mt-0.5 shrink-0" />
                       <div>
                         <div>{formatAddress(selectedOrder.address)}</div>
@@ -472,7 +472,7 @@ export default function Orders() {
                     <Gift size={14} /> Получатель
                     {selectedOrder.isAnonymous && <span className="text-xs font-normal text-orange-500 ml-1">(анонимно)</span>}
                   </h3>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                     {selectedOrder.recipientName && <div><span className="text-gray-400">Имя:</span> <span className="font-medium">{selectedOrder.recipientName}</span></div>}
                     {selectedOrder.recipientPhone && <div><span className="text-gray-400">Телефон:</span> <span className="font-medium">{selectedOrder.recipientPhone}</span></div>}
                   </div>

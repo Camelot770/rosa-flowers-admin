@@ -138,7 +138,7 @@ export default function Bouquets() {
         </div>
       )}
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold text-gray-800">Букеты</h1>
           <span className="text-sm text-gray-400">{filtered.length} из {bouquets.length}</span>
@@ -164,8 +164,8 @@ export default function Bouquets() {
       )}
 
       {/* Filters */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-xs">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[12rem] max-w-xs">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
@@ -197,7 +197,7 @@ export default function Bouquets() {
             {bouquets.length === 0 ? 'Букетов пока нет' : 'Ничего не найдено'}
           </div>
         ) : (
-          <div>
+          <div className="overflow-x-auto xl:overflow-visible">
             <table className="w-full text-sm">
               <thead className="sticky top-0 z-10">
                 <tr className="bg-gray-50 border-b border-gray-200 shadow-sm">
