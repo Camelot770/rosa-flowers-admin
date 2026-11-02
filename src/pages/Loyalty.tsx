@@ -1,6 +1,7 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { Loader2, X, History, Plus, Minus, Search, Star } from 'lucide-react';
 import api from '../api/client';
+import { getPlatform } from '../utils/platform';
 
 interface LoyaltyUser {
   id: number;
@@ -201,8 +202,8 @@ export default function Loyalty() {
                     {[user.firstName, user.lastName].filter(Boolean).join(' ') || '---'}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${user.telegramId ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
-                      {user.telegramId ? '📱 TG' : '💬 Max'}
+                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${getPlatform(user).strong}`}>
+                      {getPlatform(user).short}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">

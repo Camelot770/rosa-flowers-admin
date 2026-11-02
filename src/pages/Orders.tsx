@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, X, Truck, Store, CreditCard, Eye, User, MapPin, Clock, Gift, MessageSquare, Star, RefreshCw } from 'lucide-react';
+import { Search, X, Truck, Store, CreditCard, Eye, User, MapPin, Clock, Gift, MessageSquare, Star, RefreshCw, AlertTriangle } from 'lucide-react';
 import api from '../api/client';
 import { imageUrl } from '../utils/image';
+import { getPlatform } from '../utils/platform';
+import { formatAddress } from '../utils/address';
 
 interface OrderUser {
   id: number;
@@ -21,6 +23,7 @@ interface OrderAddress {
   apartment?: string;
   entrance?: string;
   floor?: string;
+  comment?: string | null;
 }
 
 interface OrderItem {
@@ -48,6 +51,8 @@ interface Order {
   totalPrice: number;
   bonusUsed: number;
   bonusEarned: number;
+  promoCode?: string | null;
+  promoDiscount?: number;
   paymentStatus: string;
   createdAt: string;
 }
@@ -103,6 +108,21 @@ function formatRubles(amount: number): string {
   }).format(amount);
 }
 
+function cancelConfirmText(order: Order): string {
+  const lines = [`Отменить заказ #${order.id}? Вернуть его в работу будет нельзя.`];
+  if (order.bonusUsed > 0) lines.push(`Списанные бонусы (${order.bonusUsed}) вернутся клиенту.`);
+  if (order.paymentStatus === 'paid') lines.push(`Заказ уже оплачен: ${formatRubles(order.totalPrice)} нужно вернуть вручную в кабинете ЮKassa.`);
+  return lines.join('\n\n');
+}
+
+// The order does not store its delivery price, so it is what remains of the total after the discounts
+function orderBreakdown(order: Order) {
+  const itemsTotal = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const promoDiscount = order.promoDiscount || 0;
+  const deliveryPrice = order.totalPrice - (itemsTotal - promoDiscount - order.bonusUsed);
+  return { itemsTotal, promoDiscount, deliveryPrice };
+}
+
 export default function Orders() {
   const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -140,6 +160,11 @@ export default function Orders() {
     setUpdatingId(orderId);
     setError('');
     try {
+      if (newStatus === 'canceled') {
+        // The customer may have paid since this list was loaded
+        const { data: fresh } = await api.get(`/orders/${orderId}`);
+        if (!window.confirm(cancelConfirmText(fresh))) return;
+      }
       await api.put(`/orders/${orderId}/status`, { status: newStatus });
       fetchOrders();
       if (selectedOrder?.id === orderId) {
@@ -174,6 +199,8 @@ export default function Orders() {
   allOrders.forEach((o) => {
     statusCounts[o.status] = (statusCounts[o.status] || 0) + 1;
   });
+
+  const breakdown = selectedOrder ? orderBreakdown(selectedOrder) : null;
 
   return (
     <div className="space-y-6">
@@ -258,14 +285,15 @@ export default function Orders() {
               <tbody className="divide-y divide-gray-100">
                 {filtered.map((order) => {
                   const customerName = [order.user.firstName, order.user.lastName].filter(Boolean).join(' ');
+                  const platform = getPlatform(order.user);
                   return (
                     <tr key={order.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => setSelectedOrder(order)}>
                       <td className="px-4 py-3 font-medium text-gray-800">#{order.id}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1.5">
                           <span className="text-gray-800 font-medium">{customerName}</span>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${order.user.telegramId ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}`}>
-                            {order.user.telegramId ? 'TG' : 'Max'}
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${platform.soft}`}>
+                            {platform.tag}
                           </span>
                         </div>
                         {order.user.phone && <div className="text-xs text-gray-400">{order.user.phone}</div>}
@@ -346,6 +374,14 @@ export default function Orders() {
             </div>
 
             <div className="p-5 space-y-5 max-h-[70vh] overflow-y-auto">
+              {/* Refund reminder */}
+              {selectedOrder.status === 'canceled' && selectedOrder.paymentStatus === 'paid' && (
+                <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg flex items-start gap-2">
+                  <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+                  <span>Заказ оплачен и отменён. Деньги сами не вернутся: сделайте возврат {formatRubles(selectedOrder.totalPrice)} в кабинете ЮKassa, если ещё не сделали.</span>
+                </div>
+              )}
+
               {/* Status Actions */}
               {nextStatuses[selectedOrder.status]?.length > 0 && (
                 <div className="flex gap-2">
@@ -373,8 +409,8 @@ export default function Orders() {
                   {selectedOrder.user.phone && <div><span className="text-gray-400">Телефон:</span> <span className="font-medium">{selectedOrder.user.phone}</span></div>}
                   <div>
                     <span className="text-gray-400">Платформа:</span>{' '}
-                    <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${selectedOrder.user.telegramId ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
-                      {selectedOrder.user.telegramId ? '📱 Telegram' : '💬 Max'}
+                    <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${getPlatform(selectedOrder.user).strong}`}>
+                      {getPlatform(selectedOrder.user).full}
                     </span>
                     <span className="ml-2 font-mono text-xs text-gray-400">{selectedOrder.user.telegramId || selectedOrder.user.maxId}</span>
                   </div>
@@ -413,7 +449,10 @@ export default function Orders() {
                   {selectedOrder.address && (
                     <div className="col-span-2 flex items-start gap-2">
                       <MapPin size={14} className="text-gray-400 mt-0.5 shrink-0" />
-                      <span>{selectedOrder.address.street}, {selectedOrder.address.house}{selectedOrder.address.apartment ? `, кв. ${selectedOrder.address.apartment}` : ''}{selectedOrder.address.entrance ? `, подъезд ${selectedOrder.address.entrance}` : ''}{selectedOrder.address.floor ? `, этаж ${selectedOrder.address.floor}` : ''}</span>
+                      <div>
+                        <div>{formatAddress(selectedOrder.address)}</div>
+                        {selectedOrder.address.comment && <div className="text-gray-500 mt-0.5">{selectedOrder.address.comment}</div>}
+                      </div>
                     </div>
                   )}
                   {selectedOrder.deliveryDate && (
@@ -457,14 +496,23 @@ export default function Orders() {
               )}
 
               {/* Financial */}
-              <div className="bg-gray-50 rounded-xl p-4">
-                <h3 className="text-sm font-semibold text-gray-500 uppercase mb-3 flex items-center gap-2"><CreditCard size={14} /> Итого</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between"><span className="text-gray-500">Сумма заказа</span><span className="font-medium">{formatRubles(selectedOrder.totalPrice)}</span></div>
-                  {selectedOrder.bonusUsed > 0 && <div className="flex justify-between text-green-600"><span>Использовано бонусов</span><span>-{formatRubles(selectedOrder.bonusUsed)}</span></div>}
-                  {selectedOrder.bonusEarned > 0 && <div className="flex justify-between text-primary"><span className="flex items-center gap-1"><Star size={12} /> Начислено бонусов</span><span>+{selectedOrder.bonusEarned}</span></div>}
+              {breakdown && (
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <h3 className="text-sm font-semibold text-gray-500 uppercase mb-3 flex items-center gap-2"><CreditCard size={14} /> Стоимость</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between"><span className="text-gray-500">Товары</span><span className="font-medium">{formatRubles(breakdown.itemsTotal)}</span></div>
+                    {breakdown.promoDiscount > 0 && <div className="flex justify-between text-green-600"><span>Промокод {selectedOrder.promoCode}</span><span>-{formatRubles(breakdown.promoDiscount)}</span></div>}
+                    {selectedOrder.bonusUsed > 0 && <div className="flex justify-between text-green-600"><span>Использовано бонусов</span><span>-{formatRubles(selectedOrder.bonusUsed)}</span></div>}
+                    {selectedOrder.deliveryType === 'delivery' && breakdown.deliveryPrice >= 0 && (
+                      <div className="flex justify-between"><span className="text-gray-500">Доставка</span><span className="font-medium">{breakdown.deliveryPrice > 0 ? formatRubles(breakdown.deliveryPrice) : 'бесплатно'}</span></div>
+                    )}
+                    <div className="flex justify-between pt-2 border-t border-gray-200 font-semibold text-gray-800"><span>Итого</span><span>{formatRubles(selectedOrder.totalPrice)}</span></div>
+                    {selectedOrder.bonusEarned > 0 && selectedOrder.status !== 'canceled' && (
+                      <div className="flex justify-between text-primary"><span className="flex items-center gap-1"><Star size={12} /> {selectedOrder.paymentStatus === 'paid' ? 'Начислено бонусов' : 'Начислится после оплаты'}</span><span>+{selectedOrder.bonusEarned}</span></div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <p className="text-xs text-gray-400 text-right">Создан {new Date(selectedOrder.createdAt).toLocaleString('ru-RU')}</p>
             </div>

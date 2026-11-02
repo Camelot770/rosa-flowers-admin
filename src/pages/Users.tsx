@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Loader2, Search, X, Package, Star, MapPin, Calendar } from 'lucide-react';
 import api from '../api/client';
+import { getPlatform } from '../utils/platform';
+import { formatAddress } from '../utils/address';
 
 interface UserItem {
   id: number;
@@ -178,8 +180,8 @@ export default function Users() {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">{user.phone || '---'}</td>
                     <td className="px-4 py-3">
-                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${user.telegramId ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
-                        {user.telegramId ? '📱 Telegram' : '💬 Max'}
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${getPlatform(user).strong}`}>
+                        {getPlatform(user).full}
                       </span>
                       <div className="text-[10px] text-gray-400 font-mono mt-0.5">{user.telegramId || user.maxId}</div>
                     </td>
@@ -215,8 +217,8 @@ export default function Users() {
                     <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
                       {selectedUser.username && <span>@{selectedUser.username}</span>}
                       {selectedUser.phone && <span>{selectedUser.phone}</span>}
-                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${selectedUser.telegramId ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
-                        {selectedUser.telegramId ? '📱 TG' : '💬 Max'}
+                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${getPlatform(selectedUser).strong}`}>
+                        {getPlatform(selectedUser).short}
                       </span>
                       <span className="font-mono text-xs text-gray-400">{selectedUser.telegramId || selectedUser.maxId}</span>
                     </div>
@@ -326,14 +328,7 @@ export default function Users() {
                       ) : selectedUser.addresses.map((addr) => (
                         <div key={addr.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                           <MapPin size={16} className="text-gray-400 shrink-0" />
-                          <p className="text-sm text-gray-700">
-                            {[addr.title, addr.street, addr.house,
-                              addr.apartment ? `кв. ${addr.apartment}` : null,
-                              addr.entrance ? `подъезд ${addr.entrance}` : null,
-                              addr.floor ? `этаж ${addr.floor}` : null]
-                              .filter(Boolean)
-                              .join(', ') || '---'}
-                          </p>
+                          <p className="text-sm text-gray-700">{formatAddress(addr)}</p>
                         </div>
                       ))}
                     </div>
