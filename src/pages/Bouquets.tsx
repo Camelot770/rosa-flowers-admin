@@ -16,6 +16,7 @@ interface Bouquet {
   inStock: boolean;
   isHit: boolean;
   isNew: boolean;
+  isFeatured: boolean;
   customOrder: boolean;
   images: BouquetImage[];
 }
@@ -76,11 +77,17 @@ export default function Bouquets() {
     }
   };
 
-  const handleToggle = async (id: number, field: 'inStock' | 'isHit' | 'isNew' | 'customOrder', value: boolean) => {
+  const handleToggle = async (id: number, field: 'inStock' | 'isHit' | 'isNew' | 'isFeatured' | 'customOrder', value: boolean) => {
     try {
       await api.patch(`/bouquets/${id}/toggle`, { field, value });
       setBouquets((prev) =>
-        prev.map((b) => (b.id === id ? { ...b, [field]: value } : b))
+        prev.map((b) => {
+          // isFeatured — только один букет может быть featured
+          if (field === 'isFeatured' && value === true) {
+            return { ...b, isFeatured: b.id === id };
+          }
+          return b.id === id ? { ...b, [field]: value } : b;
+        })
       );
     } catch {
       setError('Не удалось обновить статус');
@@ -192,6 +199,7 @@ export default function Bouquets() {
                   <th className="text-center px-4 py-3 font-medium text-gray-500 bg-gray-50">В наличии</th>
                   <th className="text-center px-4 py-3 font-medium text-gray-500 bg-gray-50">Хит</th>
                   <th className="text-center px-4 py-3 font-medium text-gray-500 bg-gray-50">Новинка</th>
+                  <th className="text-center px-4 py-3 font-medium text-gray-500 bg-gray-50" title="Главный букет на обложке мини-приложения">На превью</th>
                   <th className="text-center px-4 py-3 font-medium text-gray-500 bg-gray-50">Под заказ</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-500 bg-gray-50 last:rounded-tr-xl">Действия</th>
                 </tr>
@@ -238,6 +246,16 @@ export default function Bouquets() {
                           className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${b.isNew ? 'bg-green-500' : 'bg-gray-300'}`}
                         >
                           <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${b.isNew ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} />
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={() => handleToggle(b.id, 'isFeatured', !b.isFeatured)}
+                          title={b.isFeatured ? 'Этот букет сейчас на главной' : 'Поставить на главную'}
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${b.isFeatured ? 'bg-vermilion' : 'bg-gray-300'}`}
+                          style={b.isFeatured ? { backgroundColor: '#C8421E' } : undefined}
+                        >
+                          <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${b.isFeatured ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} />
                         </button>
                       </td>
                       <td className="px-4 py-3 text-center">

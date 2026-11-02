@@ -15,6 +15,7 @@ interface BouquetData {
   inStock: boolean;
   isHit: boolean;
   isNew: boolean;
+  isFeatured: boolean;
   customOrder: boolean;
   sortOrder: string;
 }
@@ -42,6 +43,7 @@ const initialData: BouquetData = {
   inStock: true,
   isHit: false,
   isNew: false,
+  isFeatured: false,
   customOrder: false,
   sortOrder: '0',
 };
@@ -80,6 +82,7 @@ export default function BouquetForm() {
           inStock: bouquet.inStock !== false,
           isHit: bouquet.isHit || false,
           isNew: bouquet.isNew || false,
+          isFeatured: bouquet.isFeatured || false,
           customOrder: bouquet.customOrder || false,
           sortOrder: String(bouquet.sortOrder || 0),
         });
@@ -146,6 +149,7 @@ export default function BouquetForm() {
       fd.append('inStock', String(form.inStock));
       fd.append('isHit', String(form.isHit));
       fd.append('isNew', String(form.isNew));
+      fd.append('isFeatured', String(form.isFeatured));
       fd.append('customOrder', String(form.customOrder));
       fd.append('sortOrder', form.sortOrder);
 
@@ -361,6 +365,20 @@ export default function BouquetForm() {
               className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary/30 accent-primary"
             />
             <span className="text-sm font-medium text-gray-700">Новинка</span>
+          </label>
+
+          <label
+            className="flex items-center gap-2 cursor-pointer select-none"
+            title="Этот букет будет показан главным на обложке мини-приложения. Может быть только один."
+          >
+            <input
+              type="checkbox"
+              name="isFeatured"
+              checked={form.isFeatured}
+              onChange={handleChange}
+              className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary/30 accent-primary"
+            />
+            <span className="text-sm font-medium text-gray-700">На превью (главный)</span>
           </label>
 
           <label className="flex items-center gap-2 cursor-pointer select-none">
