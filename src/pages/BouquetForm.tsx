@@ -402,7 +402,7 @@ export default function BouquetForm() {
           </label>
         </div>
 
-        {form.isFeatured && !form.inStock && (
+        {form.isFeatured && !form.inStock && !form.customOrder && (
           <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg flex items-start gap-2">
             <AlertTriangle size={16} className="shrink-0 mt-0.5" />
             <span>Букет выбран на превью, но его нет в наличии. Пока он не вернётся в наличие, на обложке будет другой букет.</span>

@@ -113,7 +113,7 @@ export default function Bouquets() {
   const startIndex = (currentPage - 1) * pageSize;
   const paginated = filtered.slice(startIndex, startIndex + pageSize);
 
-  const featuredOutOfStock = bouquets.find((b) => b.isFeatured && !b.inStock);
+  const featuredOutOfStock = bouquets.find((b) => b.isFeatured && !b.inStock && !b.customOrder);
 
   return (
     <div className="space-y-6">
