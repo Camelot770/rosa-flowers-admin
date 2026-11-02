@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, FormEvent, ChangeEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Upload, X, Loader2 } from 'lucide-react';
+import { ArrowLeft, Upload, X, Loader2, AlertTriangle } from 'lucide-react';
 import api from '../api/client';
 import { imageUrl } from '../utils/image';
 
@@ -54,6 +54,7 @@ export default function BouquetForm() {
   const isEdit = Boolean(id);
 
   const [form, setForm] = useState<BouquetData>(initialData);
+  const [loadedFeatured, setLoadedFeatured] = useState(false);
   const [images, setImages] = useState<File[]>([]);
   const [existingImages, setExistingImages] = useState<{ id: number; url: string }[]>([]);
   const [originalImageIds, setOriginalImageIds] = useState<number[]>([]);
@@ -86,6 +87,7 @@ export default function BouquetForm() {
           customOrder: bouquet.customOrder || false,
           sortOrder: String(bouquet.sortOrder || 0),
         });
+        setLoadedFeatured(bouquet.isFeatured || false);
         if (bouquet.images) {
           const imgs = Array.isArray(bouquet.images) ? bouquet.images : [bouquet.images];
           const mapped = imgs.map((img: any) => ({
@@ -149,7 +151,14 @@ export default function BouquetForm() {
       fd.append('inStock', String(form.inStock));
       fd.append('isHit', String(form.isHit));
       fd.append('isNew', String(form.isNew));
-      fd.append('isFeatured', String(form.isFeatured));
+      // An untouched checkbox must not overwrite a choice made elsewhere after this form was loaded.
+      // The field is still sent: a backend without the "absent means unchanged" rule reads absent as false.
+      let featured = form.isFeatured;
+      if (isEdit && form.isFeatured === loadedFeatured) {
+        const { data: fresh } = await api.get(`/bouquets/${id}`);
+        featured = !!fresh?.isFeatured;
+      }
+      fd.append('isFeatured', String(featured));
       fd.append('customOrder', String(form.customOrder));
       fd.append('sortOrder', form.sortOrder);
 
@@ -392,6 +401,13 @@ export default function BouquetForm() {
             <span className="text-sm font-medium text-gray-700">Под заказ</span>
           </label>
         </div>
+
+        {form.isFeatured && !form.inStock && (
+          <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg flex items-start gap-2">
+            <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+            <span>Букет выбран на превью, но его нет в наличии. Пока он не вернётся в наличие, на обложке будет другой букет.</span>
+          </div>
+        )}
 
         {/* Images */}
         <div>

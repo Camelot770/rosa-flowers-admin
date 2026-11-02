@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import { imageUrl } from '../utils/image';
-import { Plus, Pencil, Trash2, Search, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, X, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 
 interface BouquetImage {
   url: string;
@@ -113,6 +113,8 @@ export default function Bouquets() {
   const startIndex = (currentPage - 1) * pageSize;
   const paginated = filtered.slice(startIndex, startIndex + pageSize);
 
+  const featuredOutOfStock = bouquets.find((b) => b.isFeatured && !b.inStock);
+
   return (
     <div className="space-y-6">
       {/* Fullscreen image preview */}
@@ -152,6 +154,13 @@ export default function Bouquets() {
 
       {error && (
         <div className="p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg">{error}</div>
+      )}
+
+      {featuredOutOfStock && (
+        <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg flex items-start gap-2">
+          <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+          <span>Букет «{featuredOutOfStock.name}» выбран на превью, но его нет в наличии. Пока он не вернётся в наличие, на обложке будет другой букет.</span>
+        </div>
       )}
 
       {/* Filters */}
